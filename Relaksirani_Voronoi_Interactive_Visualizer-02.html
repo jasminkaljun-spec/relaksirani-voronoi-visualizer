@@ -1,0 +1,1847 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Relaksirani Voronoi — Interactive Relaxation Stage &amp; Force–Displacement Visualizer</title>
+  <meta name="description" content="Interactive scientific web application for analyzing Relaksirani Voronoi compression datasets (zeroed at contact 0,0; balanced 5x6 factorial design across relaxation stages 1–100)." />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    :root, [data-theme="light"] {
+      --background: #f8fafc;
+      --content: #ffffff;
+      --card: #ffffff;
+      --border: #e2e8f0;
+      --card-border: #eef2f6;
+      --foreground: #0f172a;
+      --muted-foreground: #64748b;
+      --placeholder: #94a3b8;
+      --primary: #1d4ed8;
+      --primary-foreground: #ffffff;
+      --link: #1d4ed8;
+      --success: #15803d;
+      --warning: #b45309;
+      --error: #b91c1c;
+      --chart-1: #1f77b4;
+      --chart-2: #ea580c;
+      --chart-3: #16a34a;
+      --chart-4: #dc2626;
+      --chart-5: #0891b2;
+      --chart-6: #9333ea;
+    }
+    [data-theme="dark"] {
+      --background: #0b1120;
+      --content: #111827;
+      --card: #111827;
+      --border: #243045;
+      --card-border: #1e293b;
+      --foreground: #f1f5f9;
+      --muted-foreground: #94a3b8;
+      --placeholder: #64748b;
+      --primary: #3b82f6;
+      --primary-foreground: #ffffff;
+      --link: #60a5fa;
+      --success: #4ade80;
+      --warning: #fbbf24;
+      --error: #f87171;
+      --chart-1: #60a5fa;
+      --chart-2: #fb923c;
+      --chart-3: #34d399;
+      --chart-4: #f87171;
+      --chart-5: #22d3ee;
+      --chart-6: #c084fc;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Inter, "Helvetica Neue", Arial, sans-serif;
+      font-size: 14px;
+      line-height: 1.45;
+    }
+
+    * { box-sizing: border-box; }
+    .nav-tab {
+      position: relative;
+      transition: color 150ms ease, background-color 150ms ease;
+    }
+    .nav-tab[aria-selected="true"]::after {
+      content: "";
+      position: absolute;
+      left: 10px;
+      right: 10px;
+      bottom: -1px;
+      height: 2px;
+      border-radius: 2px;
+      background: var(--primary);
+    }
+    .mini-card {
+      transition: border-color 160ms ease, transform 160ms ease;
+    }
+    .mini-card:hover {
+      border-color: var(--primary);
+      transform: translateY(-1px);
+    }
+    .matrix-cell {
+      transition: background-color 120ms ease, color 120ms ease, border-color 120ms ease;
+    }
+    input[type="number"]::-webkit-inner-spin-button { opacity: 0.7; }
+  </style>
+</head>
+<body class="bg-[var(--background)] text-[var(--foreground)] antialiased m-0 p-0">
+  <div class="min-w-0 max-w-[1420px] mx-auto px-3 sm:px-6 py-4 sm:py-5 space-y-4">
+    <!-- Top Header & Navigation -->
+    <header class="flex flex-col gap-3 border-b border-[var(--border)] pb-0">
+      <div class="flex flex-col sm:flex-row sm:items-end justify-between gap-2">
+        <div>
+          <h1 class="text-lg sm:text-2xl font-bold tracking-tight text-[var(--foreground)]">
+            Relaksirani Voronoi — Force–Displacement &amp; Relaxation Stage Analysis
+          </h1>
+          <p class="text-xs sm:text-sm text-[var(--muted-foreground)] mt-0.5">
+            Balanced 5 × 6 design (Serija 1–50 × Stages 1, 5, 10, 25, 50, 100 · 10_15 → 10_5 corrected) · Pre-contact trimmed &amp; zeroed at exact (0, 0) · 0–39 mm stroke
+          </p>
+        </div>
+        <div class="flex flex-wrap items-center gap-2 text-xs">
+          <span class="px-2.5 py-1 rounded-md bg-[var(--card)] border border-[var(--border)] text-[var(--muted-foreground)] font-mono">
+            Force: <strong class="text-[var(--foreground)]">N</strong> · Disp: <strong class="text-[var(--foreground)]">mm</strong> · Origin: <strong class="text-[var(--foreground)]">(0,0)</strong>
+          </span>
+          <button id="btnExportCsvTop" class="px-2.5 py-1 rounded-md bg-[var(--card)] border border-[var(--border)] hover:border-[var(--primary)] text-[var(--foreground)] font-medium transition-colors cursor-pointer">
+            Export CSV
+          </button>
+          <span id="publicThemeSlot"></span>
+        </div>
+      </div>
+
+      <!-- Primary Navigation Tabs -->
+      <nav role="tablist" class="flex items-center gap-1 overflow-x-auto whitespace-nowrap -mb-px">
+        <button role="tab" data-view="relaxation" aria-selected="true" class="nav-tab px-3.5 py-2.5 text-xs sm:text-sm font-semibold text-[var(--foreground)] cursor-pointer">
+          Relaxation Stage Analysis
+        </button>
+        <button role="tab" data-view="overview" aria-selected="false" class="nav-tab px-3.5 py-2.5 text-xs sm:text-sm font-medium text-[var(--muted-foreground)] hover:text-[var(--foreground)] cursor-pointer">
+          All 5 Datasets Grid
+        </button>
+        <button role="tab" data-view="studio" aria-selected="false" class="nav-tab px-3.5 py-2.5 text-xs sm:text-sm font-medium text-[var(--muted-foreground)] hover:text-[var(--foreground)] cursor-pointer">
+          Interactive Studio
+        </button>
+        <button role="tab" data-view="analytics" aria-selected="false" class="nav-tab px-3.5 py-2.5 text-xs sm:text-sm font-medium text-[var(--muted-foreground)] hover:text-[var(--foreground)] cursor-pointer">
+          Trends &amp; Trade-offs
+        </button>
+        <button role="tab" data-view="table" aria-selected="false" class="nav-tab px-3.5 py-2.5 text-xs sm:text-sm font-medium text-[var(--muted-foreground)] hover:text-[var(--foreground)] cursor-pointer">
+          Data Table (30)
+        </button>
+      </nav>
+    </header>
+
+    <!-- ==================== VIEW 1: RELAXATION STAGE ANALYSIS ==================== -->
+    <section id="view-relaxation" class="space-y-4">
+      <div class="grid grid-cols-2 lg:grid-cols-4 gap-2.5">
+        <div class="bg-[var(--card)] border border-[var(--border)] rounded-xl p-3">
+          <div class="text-xs text-[var(--muted-foreground)]">Stiffness Gain (Stage 1 → 100)</div>
+          <div class="text-lg font-bold font-mono tabular-nums mt-0.5 text-[var(--foreground)]">+62.4% <span class="text-xs font-normal text-[var(--muted-foreground)]">(271 → 437 N/mm)</span></div>
+          <div class="text-xs text-[var(--muted-foreground)] mt-0.5">Rel. Spearman ρ = +0.90 · Friedman p = 0.0004</div>
+        </div>
+        <div class="bg-[var(--card)] border border-[var(--border)] rounded-xl p-3">
+          <div class="text-xs text-[var(--muted-foreground)]">1st Peak Gain (Stage 1 → 100)</div>
+          <div class="text-lg font-bold font-mono tabular-nums mt-0.5 text-[var(--foreground)]">+43.8% <span class="text-xs font-normal text-[var(--muted-foreground)]">(453 → 649 N)</span></div>
+          <div class="text-xs text-[var(--muted-foreground)] mt-0.5">Rel. Spearman ρ = +0.90 · Friedman p = 0.0003</div>
+        </div>
+        <div class="bg-[var(--card)] border border-[var(--border)] rounded-xl p-3">
+          <div class="text-xs text-[var(--muted-foreground)]">Optimal Energy Sweet Spot</div>
+          <div class="text-lg font-bold font-mono tabular-nums mt-0.5 text-[var(--foreground)]">Stage 25 <span class="text-xs font-normal text-[var(--muted-foreground)]">(22.99 J · 494 N pl.)</span></div>
+          <div class="text-xs text-[var(--muted-foreground)] mt-0.5">Peak plateau (+21.9%) while keeping CFE = 0.89</div>
+        </div>
+        <div class="bg-[var(--card)] border border-[var(--border)] rounded-xl p-3">
+          <div class="text-xs text-[var(--muted-foreground)]">Stiffness vs. CFE Trade-off</div>
+          <div class="text-lg font-bold font-mono tabular-nums mt-0.5 text-[var(--foreground)]">0.91 → 0.77 <span class="text-xs font-normal text-[var(--muted-foreground)]">CFE drop</span></div>
+          <div class="text-xs text-[var(--muted-foreground)] mt-0.5">Zeroed Pk1 shifts 2.32 → 2.00 mm (p = 0.0049)</div>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 xl:grid-cols-12 gap-4">
+        <div class="xl:col-span-7 bg-[var(--card)] border border-[var(--border)] rounded-xl p-3.5 sm:p-4 space-y-3 min-w-0">
+          <div class="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <h2 class="text-sm font-bold text-[var(--foreground)]">Mean Force–Displacement by Relaxation Stage (Zeroed at 0,0)</h2>
+              <p class="text-xs text-[var(--muted-foreground)]">Balanced n = 5 datasets per stage (hover to compare Force [N])</p>
+            </div>
+            <div class="flex flex-wrap items-center gap-1.5 text-xs">
+              <button data-rz="0,39" class="rz-btn px-2 py-1 rounded border font-medium cursor-pointer">0–39 mm</button>
+              <button data-rz="0,5" class="rz-btn px-2 py-1 rounded border font-medium cursor-pointer">0–5 mm (1st Peak)</button>
+              <button data-rz="5,25" class="rz-btn px-2 py-1 rounded border font-medium cursor-pointer">5–25 mm</button>
+              <label class="flex items-center gap-1 text-[var(--muted-foreground)] ml-1 cursor-pointer select-none">
+                <input id="chkRelaxSd" type="checkbox" checked class="accent-[var(--primary)]" /> ±1 SD
+              </label>
+            </div>
+          </div>
+          <div id="relaxStagePills" class="flex flex-wrap gap-1.5 text-xs"></div>
+          <div class="relative w-full h-[340px] sm:h-[380px]">
+            <canvas id="relaxCurveCanvas" class="w-full h-full block cursor-crosshair"></canvas>
+          </div>
+          <div id="relaxHoverBar" class="pt-2 border-t border-[var(--card-border)] flex flex-wrap gap-x-3 gap-y-1 text-xs font-mono tabular-nums text-[var(--muted-foreground)]">
+            Hover over the chart to inspect exact stage mean Force [N] at any zeroed displacement [mm].
+          </div>
+        </div>
+
+        <div class="xl:col-span-5 bg-[var(--card)] border border-[var(--border)] rounded-xl p-3.5 sm:p-4 space-y-3 min-w-0">
+          <div>
+            <h2 class="text-sm font-bold text-[var(--foreground)]">Normalized Relaxation Effect (Δ% vs. Stage 1)</h2>
+            <p class="text-xs text-[var(--muted-foreground)]">Mean within-dataset relative change (log scale; removes dataset baseline differences)</p>
+          </div>
+          <div id="relLegend" class="flex flex-wrap gap-2 text-xs"></div>
+          <div class="relative w-full h-[340px] sm:h-[380px]">
+            <canvas id="relaxDeltaCanvas" class="w-full h-full block"></canvas>
+          </div>
+          <div class="pt-2 border-t border-[var(--card-border)] text-xs text-[var(--muted-foreground)]">
+            Stiffness and 1st peak scale linearly with log₁₀(stage), whereas plateau force and absorbed energy saturate at <strong class="text-[var(--foreground)]">Stage 25</strong>.
+          </div>
+        </div>
+      </div>
+
+      <div class="bg-[var(--card)] border border-[var(--border)] rounded-xl overflow-hidden">
+        <div class="px-4 py-3 border-b border-[var(--card-border)]">
+          <h2 class="text-sm font-bold text-[var(--foreground)]">Mechanical Properties by Relaxation Stage (Balanced n = 5 · Zeroed at 0,0)</h2>
+          <p class="text-xs text-[var(--muted-foreground)]">All 6 stages contain all 5 datasets (1, 5, 10, 25, 50) after correcting 10_15 → 10_5. Click any stage to inspect its individual zeroed curves in Studio.</p>
+        </div>
+        <div class="overflow-x-auto">
+          <table class="w-full text-xs text-left border-collapse">
+            <thead class="bg-[var(--background)] text-[var(--muted-foreground)] border-b border-[var(--border)]">
+              <tr>
+                <th class="py-2.5 px-3 font-semibold">Relaxation Stage</th>
+                <th class="py-2.5 px-3 font-semibold text-center">n</th>
+                <th class="py-2.5 px-3 font-semibold text-right">Stiffness [N/mm]</th>
+                <th class="py-2.5 px-3 font-semibold text-right">Δk vs S1</th>
+                <th class="py-2.5 px-3 font-semibold text-right">1st Peak [N]</th>
+                <th class="py-2.5 px-3 font-semibold text-right">ΔPk1 vs S1</th>
+                <th class="py-2.5 px-3 font-semibold text-right">Disp @ Pk1</th>
+                <th class="py-2.5 px-3 font-semibold text-right">Plateau 5–25 [N]</th>
+                <th class="py-2.5 px-3 font-semibold text-right">CFE</th>
+                <th class="py-2.5 px-3 font-semibold text-right">E 0–30 [J]</th>
+                <th class="py-2.5 px-3 font-semibold text-right">E 0–39 [J]</th>
+                <th class="py-2.5 px-3 font-semibold text-right">Max Force [N]</th>
+                <th class="py-2.5 px-3 font-semibold text-center">Inspect</th>
+              </tr>
+            </thead>
+            <tbody id="relaxStageTableBody" class="divide-y divide-[var(--card-border)] font-mono tabular-nums"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="bg-[var(--card)] border border-[var(--border)] rounded-xl overflow-hidden">
+        <div class="px-4 py-3 border-b border-[var(--card-border)]">
+          <h2 class="text-sm font-bold text-[var(--foreground)]">Statistical Significance of Relaxation Stage Effect (Balanced 5 × 6 Design)</h2>
+          <p class="text-xs text-[var(--muted-foreground)]">Spearman rank correlation (n = 30), within-dataset relative Δ% correlation, log₁₀(stage) slope, and repeated-measures Friedman test across all 6 stages (1, 5, 10, 25, 50, 100)</p>
+        </div>
+        <div class="overflow-x-auto">
+          <table class="w-full text-xs text-left border-collapse">
+            <thead class="bg-[var(--background)] text-[var(--muted-foreground)] border-b border-[var(--border)]">
+              <tr>
+                <th class="py-2.5 px-3 font-semibold">Mechanical Metric</th>
+                <th class="py-2.5 px-3 font-semibold text-right">Spearman ρ (p)</th>
+                <th class="py-2.5 px-3 font-semibold text-right">Within-Dataset Δ% ρ (p)</th>
+                <th class="py-2.5 px-3 font-semibold text-right">Log₁₀ Slope / decade</th>
+                <th class="py-2.5 px-3 font-semibold text-right">Friedman(6) χ² (p)</th>
+                <th class="py-2.5 px-3 font-semibold">Significance</th>
+              </tr>
+            </thead>
+            <tbody id="statTestsBody" class="divide-y divide-[var(--card-border)] font-mono tabular-nums"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==================== VIEW 2: OVERVIEW GRID (ALL 5 DATASETS) ==================== -->
+    <section id="view-overview" class="hidden space-y-4">
+      <div class="bg-[var(--card)] border border-[var(--border)] rounded-xl px-3.5 py-2.5 flex flex-wrap items-center justify-between gap-2 text-xs">
+        <div id="syncReadout" class="font-mono tabular-nums text-[var(--muted-foreground)]">
+          Hover over any graph below to sweep a synchronized cursor across all 6 panels · Click any dataset card to open it in Interactive Studio.
+        </div>
+        <label class="flex items-center gap-1.5 text-[var(--muted-foreground)] cursor-pointer select-none shrink-0">
+          <input id="chkOverviewZoom" type="checkbox" class="accent-[var(--primary)]" />
+          Zoom 0–5 mm (1st peak)
+        </label>
+      </div>
+      <div id="overviewGrid" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3.5"></div>
+    </section>
+
+    <!-- ==================== VIEW 3: INTERACTIVE STUDIO ==================== -->
+    <section id="view-studio" class="hidden space-y-3.5">
+      <div class="grid grid-cols-1 xl:grid-cols-12 gap-3.5 items-start">
+        <aside class="xl:col-span-3 bg-[var(--card)] border border-[var(--border)] rounded-xl p-3.5 space-y-4">
+          <div class="space-y-1.5">
+            <div class="text-xs font-semibold uppercase tracking-wider text-[var(--muted-foreground)]">Group / Selection Mode</div>
+            <div class="grid grid-cols-2 gap-1 text-xs">
+              <button data-smode="stage" class="smode-btn px-2 py-1.5 rounded-md border font-medium cursor-pointer">By Relax. Stage</button>
+              <button data-smode="series" class="smode-btn px-2 py-1.5 rounded-md border font-medium cursor-pointer">By Dataset</button>
+              <button data-smode="custom" class="smode-btn px-2 py-1.5 rounded-md border font-medium cursor-pointer">Mix &amp; Match</button>
+              <button data-smode="stage_means" class="smode-btn px-2 py-1.5 rounded-md border font-medium cursor-pointer">Stage Means ± SD</button>
+            </div>
+          </div>
+
+          <div id="panelStagePick" class="space-y-1.5">
+            <div class="text-xs font-semibold uppercase tracking-wider text-[var(--muted-foreground)]">Relaxation Stage (n = 5)</div>
+            <div id="studioStageBtns" class="grid grid-cols-3 gap-1.5 text-xs"></div>
+          </div>
+
+          <div id="panelSeriesPick" class="hidden space-y-1.5">
+            <div class="text-xs font-semibold uppercase tracking-wider text-[var(--muted-foreground)]">Dataset</div>
+            <div id="studioSeriesBtns" class="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-2 gap-1.5 text-xs"></div>
+          </div>
+
+          <div id="panelCustomMatrix" class="hidden space-y-2">
+            <div class="flex items-center justify-between">
+              <span class="text-xs font-semibold uppercase tracking-wider text-[var(--muted-foreground)]">Select Specimens</span>
+              <div class="flex gap-1.5 text-xs">
+                <button id="btnCustomTop5" class="text-[var(--link)] hover:underline cursor-pointer">Stage 100s</button>
+                <button id="btnCustomClear" class="text-[var(--muted-foreground)] hover:text-[var(--foreground)] cursor-pointer">Clear</button>
+              </div>
+            </div>
+            <div id="customMatrixGrid" class="space-y-1.5 text-xs"></div>
+          </div>
+
+          <div class="space-y-2 pt-2 border-t border-[var(--card-border)]">
+            <div class="text-xs font-semibold uppercase tracking-wider text-[var(--muted-foreground)]">Overlays</div>
+            <label class="flex items-center gap-2 text-xs text-[var(--foreground)] cursor-pointer select-none">
+              <input id="stChkPeaks" type="checkbox" checked class="accent-[var(--primary)]" />
+              Mark 1st Peak Force (0–5 mm)
+            </label>
+            <label class="flex items-center gap-2 text-xs text-[var(--foreground)] cursor-pointer select-none">
+              <input id="stChkPlateau" type="checkbox" checked class="accent-[var(--primary)]" />
+              Shade plateau window (5–25 mm)
+            </label>
+            <label class="flex items-center gap-2 text-xs text-[var(--foreground)] cursor-pointer select-none">
+              <input id="stChkEnergy" type="checkbox" class="accent-[var(--primary)]" />
+              Overlay Cumulative Energy [J]
+            </label>
+          </div>
+
+          <div class="space-y-2 pt-2 border-t border-[var(--card-border)]">
+            <div class="flex items-center justify-between">
+              <span class="text-xs font-semibold uppercase tracking-wider text-[var(--muted-foreground)]">Axis Units</span>
+              <label class="flex items-center gap-1.5 text-xs cursor-pointer select-none text-[var(--foreground)]">
+                <input id="stChkStress" type="checkbox" class="accent-[var(--primary)]" />
+                Stress–Strain
+              </label>
+            </div>
+            <div id="stressInputs" class="hidden grid grid-cols-2 gap-2 text-xs">
+              <label class="space-y-1">
+                <span class="text-[var(--muted-foreground)] block">Area A [mm²]</span>
+                <input id="inpArea" type="number" min="1" step="10" value="2500" class="w-full px-2 py-1 rounded-md bg-[var(--background)] border border-[var(--border)] font-mono text-[var(--foreground)]" />
+              </label>
+              <label class="space-y-1">
+                <span class="text-[var(--muted-foreground)] block">Height H₀ [mm]</span>
+                <input id="inpHeight" type="number" min="1" step="1" value="50" class="w-full px-2 py-1 rounded-md bg-[var(--background)] border border-[var(--border)] font-mono text-[var(--foreground)]" />
+              </label>
+            </div>
+          </div>
+
+          <div class="pt-2 border-t border-[var(--card-border)]">
+            <button id="btnDownloadPng" class="w-full py-2 px-3 rounded-lg bg-[var(--primary)] text-[var(--primary-foreground)] text-xs font-semibold hover:opacity-90 transition-opacity cursor-pointer">
+              Download Current Chart (PNG)
+            </button>
+          </div>
+        </aside>
+
+        <div class="xl:col-span-9 bg-[var(--card)] border border-[var(--border)] rounded-xl p-3.5 sm:p-4 space-y-3 min-w-0">
+          <div class="flex flex-wrap items-center justify-between gap-2 text-xs">
+            <div class="flex flex-wrap items-center gap-1.5">
+              <button data-z="0,39" class="z-btn px-2.5 py-1 rounded-md border font-medium cursor-pointer">Full 0–39 mm</button>
+              <button data-z="0,5" class="z-btn px-2.5 py-1 rounded-md border font-medium cursor-pointer">Elastic &amp; 1st Peak (0–5)</button>
+              <button data-z="5,25" class="z-btn px-2.5 py-1 rounded-md border font-medium cursor-pointer">Plateau (5–25)</button>
+              <button data-z="25,39" class="z-btn px-2.5 py-1 rounded-md border font-medium cursor-pointer">Densification (25–39)</button>
+            </div>
+            <div class="flex items-center gap-2 text-[var(--muted-foreground)]">
+              <span class="hidden sm:inline">Drag horizontally to zoom · Double-click to reset</span>
+              <button id="btnResetZoom" class="hidden px-2 py-0.5 rounded bg-[var(--background)] border border-[var(--border)] text-[var(--foreground)] cursor-pointer">Reset Zoom</button>
+            </div>
+          </div>
+          <div id="studioPills" class="flex flex-wrap items-center gap-1.5 text-xs"></div>
+          <div class="relative w-full h-[380px] sm:h-[490px] select-none">
+            <canvas id="studioCanvas" class="w-full h-full block cursor-crosshair"></canvas>
+          </div>
+          <div id="studioHoverBar" class="pt-2.5 border-t border-[var(--card-border)] flex flex-wrap items-center gap-x-4 gap-y-1 text-xs font-mono tabular-nums text-[var(--muted-foreground)]">
+            Move cursor across chart for exact Force [N], zeroed Displacement [mm], and Cumulative Energy [J] readouts.
+          </div>
+        </div>
+      </div>
+      <div id="studioMetricsCards" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5"></div>
+    </section>
+
+    <!-- ==================== VIEW 4: TRENDS & TRADE-OFFS ==================== -->
+    <section id="view-analytics" class="hidden space-y-4">
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <div class="bg-[var(--card)] border border-[var(--border)] rounded-xl p-4 space-y-3">
+          <div class="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <h2 class="text-sm font-bold text-[var(--foreground)]">Metric Progression vs. Relaxation Stage</h2>
+              <p class="text-xs text-[var(--muted-foreground)]">Compare how each dataset responds from Stage 1 to Stage 100</p>
+            </div>
+            <select id="selTrendMetric" class="bg-[var(--background)] border border-[var(--border)] rounded-md px-2.5 py-1 text-xs text-[var(--foreground)]">
+              <option value="k">Initial Stiffness [N/mm]</option>
+              <option value="pk1">First Peak Force [N]</option>
+              <option value="pl">Mean Plateau Force 5–25 mm [N]</option>
+              <option value="cfe">Crush Force Efficiency (CFE)</option>
+              <option value="e30">Absorbed Energy 0–30 mm [J]</option>
+              <option value="e39">Total Absorbed Energy 0–39 mm [J]</option>
+              <option value="fmax">Max Force [N]</option>
+            </select>
+          </div>
+          <div class="relative w-full h-[340px]">
+            <canvas id="trendCanvas" class="w-full h-full block"></canvas>
+          </div>
+          <div id="trendLegend" class="flex flex-wrap gap-3 text-xs text-[var(--muted-foreground)] pt-1"></div>
+        </div>
+
+        <div class="bg-[var(--card)] border border-[var(--border)] rounded-xl p-4 space-y-3">
+          <div class="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <h2 class="text-sm font-bold text-[var(--foreground)]">Design Trade-off Space (All 30 Specimens)</h2>
+              <p class="text-xs text-[var(--muted-foreground)]">Hover any point to inspect specimen &amp; relaxation stage</p>
+            </div>
+            <div class="flex flex-wrap items-center gap-1.5">
+              <select id="selScatterColor" class="bg-[var(--background)] border border-[var(--border)] rounded-md px-2 py-1 text-xs text-[var(--foreground)]">
+                <option value="stage">Color: Relaxation Stage</option>
+                <option value="series">Color: Dataset</option>
+              </select>
+              <select id="selScatterPreset" class="bg-[var(--background)] border border-[var(--border)] rounded-md px-2 py-1 text-xs text-[var(--foreground)]">
+                <option value="pk1,e39">1st Peak [N] vs. Energy [J]</option>
+                <option value="k,cfe">Stiffness [N/mm] vs. CFE</option>
+                <option value="pl,e30">Plateau [N] vs. E 0–30 [J]</option>
+                <option value="fmax,drop">Max Force [N] vs. Late Drop [N]</option>
+              </select>
+            </div>
+          </div>
+          <div class="relative w-full h-[340px]">
+            <canvas id="scatterCanvas" class="w-full h-full block cursor-crosshair"></canvas>
+          </div>
+          <div id="scatterReadout" class="text-xs font-mono tabular-nums text-[var(--muted-foreground)] pt-1 min-h-[18px]">
+            Hover over a specimen point to inspect its exact performance profile.
+          </div>
+        </div>
+      </div>
+
+      <div class="bg-[var(--card)] border border-[var(--border)] rounded-xl overflow-hidden">
+        <div class="px-4 py-3 border-b border-[var(--card-border)]">
+          <h2 class="text-sm font-bold text-[var(--foreground)]">Per-Dataset Statistical Summary (Mean ± SD, n = 6 · Zeroed at 0,0)</h2>
+        </div>
+        <div class="overflow-x-auto">
+          <table class="w-full text-xs text-left border-collapse">
+            <thead class="bg-[var(--background)] text-[var(--muted-foreground)] border-b border-[var(--border)]">
+              <tr>
+                <th class="py-2.5 px-3 font-semibold">Dataset</th>
+                <th class="py-2.5 px-3 font-semibold text-right">Stiffness [N/mm]</th>
+                <th class="py-2.5 px-3 font-semibold text-right">1st Peak [N]</th>
+                <th class="py-2.5 px-3 font-semibold text-right">Disp @ Pk1 [mm]</th>
+                <th class="py-2.5 px-3 font-semibold text-right">Plateau 5–25 [N]</th>
+                <th class="py-2.5 px-3 font-semibold text-right">CFE</th>
+                <th class="py-2.5 px-3 font-semibold text-right">Energy 0–30 [J]</th>
+                <th class="py-2.5 px-3 font-semibold text-right">Energy 0–39 [J]</th>
+                <th class="py-2.5 px-3 font-semibold text-right">Max Force [N]</th>
+              </tr>
+            </thead>
+            <tbody id="seriesSummaryBody" class="divide-y divide-[var(--card-border)] font-mono tabular-nums"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==================== VIEW 5: FULL 30-SPECIMEN TABLE ==================== -->
+    <section id="view-table" class="hidden space-y-3">
+      <div class="bg-[var(--card)] border border-[var(--border)] rounded-xl overflow-hidden">
+        <div class="p-3.5 border-b border-[var(--card-border)] flex flex-wrap items-center justify-between gap-2">
+          <div class="flex flex-wrap items-center gap-2">
+            <input id="tblSearch" type="text" placeholder="Filter specimen (e.g. 10_5)..." class="px-2.5 py-1.5 rounded-md bg-[var(--background)] border border-[var(--border)] text-xs text-[var(--foreground)] placeholder-[var(--placeholder)] w-48" />
+            <select id="tblSeriesFilter" class="px-2.5 py-1.5 rounded-md bg-[var(--background)] border border-[var(--border)] text-xs text-[var(--foreground)]">
+              <option value="ALL">All Datasets</option>
+              <option value="Serija_1">Serija 1</option>
+              <option value="Serija_5">Serija 5</option>
+              <option value="Serija_10">Serija 10</option>
+              <option value="Serija_25">Serija 25</option>
+              <option value="Serija_50">Serija 50</option>
+            </select>
+            <select id="tblStageFilter" class="px-2.5 py-1.5 rounded-md bg-[var(--background)] border border-[var(--border)] text-xs text-[var(--foreground)]">
+              <option value="ALL">All Relaxation Stages</option>
+              <option value="1">Stage 1</option>
+              <option value="5">Stage 5</option>
+              <option value="10">Stage 10</option>
+              <option value="25">Stage 25</option>
+              <option value="50">Stage 50</option>
+              <option value="100">Stage 100</option>
+            </select>
+          </div>
+          <div class="flex items-center gap-2 text-xs">
+            <span id="tblCount" class="text-[var(--muted-foreground)]">30 specimens</span>
+            <button id="btnExportCsvTbl" class="px-2.5 py-1.5 rounded-md bg-[var(--primary)] text-[var(--primary-foreground)] font-semibold cursor-pointer">
+              Download CSV
+            </button>
+          </div>
+        </div>
+        <div class="overflow-x-auto">
+          <table class="w-full text-xs text-left border-collapse">
+            <thead class="bg-[var(--background)] text-[var(--muted-foreground)] border-b border-[var(--border)] select-none">
+              <tr>
+                <th data-tsort="s" class="py-2.5 px-3 font-semibold cursor-pointer hover:text-[var(--foreground)]">Dataset</th>
+                <th data-tsort="stage" class="py-2.5 px-3 font-semibold text-center cursor-pointer hover:text-[var(--foreground)]">Relax. Stage</th>
+                <th data-tsort="id" class="py-2.5 px-3 font-semibold cursor-pointer hover:text-[var(--foreground)]">Specimen</th>
+                <th data-tsort="d0" class="py-2.5 px-3 font-semibold text-right cursor-pointer hover:text-[var(--foreground)]" title="Trimmed pre-contact displacement">Trim d₀ [mm]</th>
+                <th data-tsort="k" class="py-2.5 px-3 font-semibold text-right cursor-pointer hover:text-[var(--foreground)]">Stiffness [N/mm]</th>
+                <th data-tsort="rk" class="py-2.5 px-3 font-semibold text-right cursor-pointer hover:text-[var(--foreground)]">Δk% vs S1</th>
+                <th data-tsort="pk1" class="py-2.5 px-3 font-semibold text-right cursor-pointer hover:text-[var(--foreground)]">1st Peak [N]</th>
+                <th data-tsort="pl" class="py-2.5 px-3 font-semibold text-right cursor-pointer hover:text-[var(--foreground)]">Plateau [N]</th>
+                <th data-tsort="cfe" class="py-2.5 px-3 font-semibold text-right cursor-pointer hover:text-[var(--foreground)]">CFE</th>
+                <th data-tsort="e30" class="py-2.5 px-3 font-semibold text-right cursor-pointer hover:text-[var(--foreground)]">E 0–30 [J]</th>
+                <th data-tsort="e39" class="py-2.5 px-3 font-semibold text-right cursor-pointer hover:text-[var(--foreground)]">E 0–39 [J]</th>
+                <th data-tsort="fmax" class="py-2.5 px-3 font-semibold text-right cursor-pointer hover:text-[var(--foreground)]">Max Force [N]</th>
+                <th data-tsort="drop" class="py-2.5 px-3 font-semibold text-right cursor-pointer hover:text-[var(--foreground)]">Late Drop [N]</th>
+                <th class="py-2.5 px-3 font-semibold text-center">Action</th>
+              </tr>
+            </thead>
+            <tbody id="fullTableBody" class="divide-y divide-[var(--card-border)] font-mono tabular-nums"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <script>
+    const DATA = {"disp":[0.0,0.2,0.4,0.6,0.8,1.0,1.2,1.4,1.6,1.8,2.0,2.2,2.4,2.6,2.8,3.0,3.2,3.4,3.6,3.8,4.0,4.2,4.4,4.6,4.8,5.0,5.5,6.0,6.5,7.0,7.5,8.0,8.5,9.0,9.5,10.0,10.5,11.0,11.5,12.0,12.5,13.0,13.5,14.0,14.5,15.0,15.5,16.0,16.5,17.0,17.5,18.0,18.5,19.0,19.5,20.0,20.5,21.0,21.5,22.0,22.5,23.0,23.5,24.0,24.5,25.0,25.5,26.0,26.5,27.0,27.5,28.0,28.5,29.0,29.5,30.0,30.5,31.0,31.5,32.0,32.5,33.0,33.5,34.0,34.5,35.0,35.5,36.0,36.5,37.0,37.5,38.0,38.5,39.0],"series":{"Serija_1":{"orig":"Serija_1_excel podaci.csv","specimens":{"1_1":[0.0,39.3,86.1,134.0,180.9,225.0,266.9,303.3,334.9,357.8,374.0,383.9,387.5,387.4,382.6,376.4,368.7,359.8,350.4,341.4,331.1,321.3,311.8,304.9,303.5,304.6,307.0,306.8,309.3,313.8,318.0,325.6,334.9,357.3,381.7,390.5,381.2,347.2,321.9,310.4,307.4,316.9,316.0,312.3,325.3,330.7,336.6,360.7,381.3,412.8,431.0,435.4,438.6,448.9,466.6,499.5,513.6,514.2,523.4,538.1,546.5,549.6,554.2,571.9,608.2,655.4,704.2,744.5,744.8,721.9,725.0,717.1,687.3,643.1,602.4,587.8,581.6,624.3,738.4,810.1,811.0,768.5,754.2,744.9,741.1,755.6,774.2,820.5,922.0,1001.8,1044.4,1030.3,1082.9,1157.6],"1_5":[0.0,45.4,98.9,154.1,207.7,258.3,304.6,345.1,378.7,403.0,419.9,429.6,433.6,434.2,430.6,426.4,420.2,413.8,407.3,401.3,395.4,389.4,383.2,377.4,375.8,374.5,369.7,360.2,351.1,343.4,335.5,326.0,314.7,307.5,353.1,384.9,398.9,410.5,416.5,416.6,414.5,420.4,421.8,415.2,396.1,413.7,419.2,410.8,403.4,404.1,441.2,493.3,524.2,555.2,579.7,615.0,591.4,574.4,556.5,582.1,603.0,614.3,568.0,474.3,502.0,506.7,516.3,548.4,571.6,597.9,616.9,617.7,602.4,601.7,616.1,598.1,572.6,534.3,524.5,544.2,604.1,697.4,724.7,731.6,795.6,881.0,920.7,973.7,1011.5,989.3,974.2,1025.6,1149.7,1306.2],"1_10":[0.0,51.2,110.2,170.9,230.0,285.4,337.7,382.4,417.9,442.6,458.8,468.1,471.6,470.8,467.1,462.3,455.1,447.1,438.6,430.8,423.7,417.1,413.7,411.9,410.2,407.9,403.1,396.8,392.5,393.1,400.7,410.2,410.0,410.8,423.5,446.4,455.0,444.4,440.3,451.5,459.1,471.3,480.3,487.7,493.3,494.1,481.9,464.0,439.8,431.0,472.1,528.3,561.7,597.3,625.3,627.1,588.5,542.6,529.4,509.8,517.6,576.8,577.1,589.3,566.6,568.2,612.0,676.4,698.9,725.7,738.0,741.0,737.3,738.4,736.8,730.4,735.3,738.6,749.7,764.0,813.0,906.0,1015.7,1106.8,1158.6,1289.3,1363.0,1366.9,1352.0,1317.0,1290.2,1389.2,1495.8,1505.7],"1_25":[0.0,55.5,125.1,193.4,259.1,320.4,377.4,425.1,460.4,482.3,492.0,490.3,484.4,475.4,467.5,458.4,449.8,441.7,433.7,426.9,420.3,413.9,410.8,410.7,411.0,411.5,413.8,417.2,404.0,388.7,387.5,384.1,392.5,411.0,400.3,404.7,418.7,428.2,453.4,463.3,479.5,477.9,476.2,469.4,461.8,453.6,444.9,434.5,420.8,408.9,397.3,400.6,407.8,415.3,442.5,469.0,489.4,500.8,511.3,553.7,594.5,628.8,646.1,646.0,605.4,519.2,472.7,469.7,550.1,676.9,747.0,815.5,879.2,860.1,821.7,828.1,838.3,841.2,854.9,882.3,900.9,863.6,825.1,783.9,783.8,845.5,866.5,905.9,1029.5,1111.5,1128.9,1164.6,1295.4,1407.5],"1_50":[0.0,69.4,149.9,230.8,308.8,382.9,449.4,505.8,546.4,571.1,582.2,582.6,576.3,566.2,554.4,540.2,525.6,511.0,497.5,484.5,474.9,466.5,458.2,450.9,443.8,437.4,426.5,422.9,423.9,429.0,431.2,420.6,448.8,463.9,458.3,448.3,435.4,417.4,421.3,425.8,434.2,434.2,417.8,403.8,404.6,403.3,404.5,413.1,443.5,465.6,497.6,518.0,532.9,529.1,505.7,462.0,449.0,419.0,388.9,396.2,413.8,436.2,468.5,522.0,565.6,605.6,666.3,715.6,738.7,757.4,757.8,769.6,786.2,799.4,829.7,828.5,777.7,656.6,599.0,561.9,572.1,555.1,563.7,596.4,618.5,615.1,612.7,617.3,665.4,749.6,841.2,984.2,1116.2,1263.5],"1_100":[0.0,75.6,163.3,250.9,335.3,415.7,486.4,544.0,584.4,605.1,610.5,605.5,589.1,555.5,508.1,482.7,463.3,446.4,432.2,419.8,409.7,402.1,335.1,321.0,319.0,318.2,317.8,302.0,282.9,237.0,305.4,364.0,417.8,470.7,502.8,521.2,531.4,509.2,494.7,472.1,442.6,397.1,397.2,397.9,402.9,415.1,464.5,534.1,559.9,568.5,583.3,562.4,527.4,506.7,488.0,450.5,419.4,400.6,408.2,464.4,559.6,674.8,776.3,843.5,864.1,770.1,659.9,597.1,551.6,522.0,485.7,473.5,483.5,463.8,490.7,500.2,575.1,626.4,740.0,798.3,764.9,838.3,900.4,933.3,967.7,1019.6,1093.2,1199.9,1276.9,1337.3,1396.2,1403.4,1338.2,1156.4]},"mean":[0.0,56.1,122.2,189.1,253.6,314.6,370.4,417.6,453.8,477.0,489.6,493.3,490.4,481.6,468.4,457.7,447.1,436.6,426.6,417.4,409.2,401.7,385.5,379.5,377.2,375.7,373.0,367.7,360.6,350.8,363.1,371.8,386.5,403.5,420.0,432.7,436.8,426.1,424.7,423.3,422.9,419.6,418.2,414.4,414.0,418.4,425.3,436.2,441.4,448.5,470.4,489.7,498.8,508.7,518.0,520.5,508.6,491.9,486.3,507.4,539.2,580.1,598.4,607.8,618.6,604.2,605.2,625.3,642.6,667.0,678.4,689.1,696.0,684.4,682.9,678.8,680.1,670.3,701.1,726.8,744.3,771.5,797.3,816.1,844.2,901.0,938.4,980.7,1042.9,1084.4,1112.5,1166.2,1246.4,1299.5],"std":[0.0,14.0,29.9,45.1,59.5,73.5,84.7,93.1,96.7,96.1,92.1,86.3,79.2,69.1,59.6,54.9,51.7,49.4,47.8,46.5,46.8,47.3,54.2,56.8,55.7,53.8,50.7,53.7,56.0,68.9,50.5,40.7,51.5,62.7,54.2,51.2,53.2,52.5,57.7,59.3,60.7,58.9,60.2,62.0,58.3,54.6,51.9,58.7,62.5,63.0,65.2,60.8,60.8,67.4,70.3,79.6,70.9,68.7,69.8,67.6,69.0,82.6,104.0,129.5,126.2,98.2,91.7,105.7,94.6,90.0,107.4,124.5,139.6,144.4,135.4,137.1,118.2,106.4,118.8,140.1,129.2,129.1,155.4,178.8,190.6,232.9,261.8,268.6,248.4,222.1,204.8,188.3,158.8,138.6]},"Serija_5":{"orig":"Serija_5_excel podaci.csv","specimens":{"5_1":[0.0,44.3,103.8,162.2,219.9,273.7,325.1,372.6,414.1,445.8,468.7,481.5,487.2,484.6,476.7,462.5,447.6,429.5,414.5,405.0,397.7,390.3,382.3,380.7,381.3,382.0,385.6,385.5,378.9,372.5,371.2,375.5,378.1,378.0,380.5,395.8,410.8,409.2,409.6,423.8,448.2,477.6,491.1,485.2,474.9,461.1,452.3,440.3,432.2,427.1,421.4,417.6,417.9,433.1,442.6,442.6,429.9,408.9,398.6,411.1,412.5,428.9,452.7,488.3,524.5,550.1,529.3,528.6,496.7,476.1,478.4,501.1,534.7,559.5,575.2,609.3,627.7,608.6,588.2,618.7,665.1,637.0,514.5,460.1,425.5,415.4,451.2,520.1,592.8,648.5,695.7,754.5,780.5,797.8],"5_5":[0.0,48.8,112.3,174.4,233.8,290.9,343.4,389.6,425.9,451.8,466.9,475.0,475.9,474.3,469.4,463.2,456.1,448.1,439.9,431.5,422.4,412.0,402.6,392.8,383.9,375.4,359.6,353.7,355.0,361.0,370.4,374.6,369.4,329.7,373.8,409.8,450.0,467.2,465.0,456.1,442.8,422.1,401.0,402.6,414.1,421.0,415.2,412.0,420.5,423.6,440.8,484.4,498.3,503.9,523.1,568.4,594.9,596.8,586.2,569.3,533.1,508.7,492.1,509.4,569.0,607.7,619.5,731.2,656.7,651.9,624.0,650.8,665.4,664.7,648.1,613.9,606.8,590.8,638.1,685.5,741.0,784.7,772.6,766.7,762.2,768.2,829.7,892.0,887.5,970.7,978.1,1043.5,1106.8,1120.1],"5_10":[0.0,60.2,131.6,203.3,272.1,337.1,395.4,444.6,480.5,502.9,513.2,515.3,511.9,505.3,494.9,482.8,469.3,457.5,446.5,436.1,426.8,417.7,409.4,404.1,398.1,394.2,389.9,401.1,419.5,418.8,422.8,422.3,404.3,400.3,396.6,432.8,446.4,428.5,450.7,459.4,466.5,465.4,460.7,464.9,459.9,454.5,455.2,466.5,493.3,510.4,520.9,519.4,503.7,487.5,503.3,551.3,614.6,635.1,631.6,601.8,558.6,481.7,498.4,504.8,521.8,575.8,610.3,638.5,700.5,724.5,718.6,693.4,652.1,645.7,696.5,764.7,825.5,831.1,809.5,532.9,703.8,782.8,842.4,919.9,910.2,838.5,965.8,1035.1,1129.8,1126.8,1126.4,1177.4,1168.1,1197.7],"5_25":[0.0,75.0,164.7,252.4,336.8,415.4,484.8,539.9,577.2,597.2,603.3,602.0,595.0,585.5,574.6,563.6,552.8,543.0,534.2,526.7,521.0,517.3,514.0,511.5,509.0,508.7,507.7,493.8,479.1,365.4,361.2,355.3,352.3,353.0,353.4,378.0,385.5,392.2,394.7,391.1,388.2,412.4,463.3,492.2,526.9,536.0,578.7,594.8,630.3,661.2,659.0,632.7,604.4,581.1,560.0,562.0,602.2,618.0,661.1,664.0,641.9,611.5,538.9,473.7,431.7,407.6,380.1,345.2,327.7,329.0,361.8,419.1,468.7,509.2,547.3,611.7,639.6,577.8,558.3,534.5,508.5,492.9,479.6,468.5,466.1,471.3,542.5,627.0,667.1,652.2,618.6,666.2,727.6,769.6],"5_50":[0.0,83.5,179.1,274.3,366.6,453.1,529.7,591.7,634.6,658.4,666.0,661.9,652.6,640.5,627.3,611.9,600.7,593.3,588.6,586.6,586.6,588.4,592.1,597.1,601.0,604.1,597.9,574.0,541.7,515.2,483.5,443.0,417.8,419.1,434.1,426.9,411.9,407.7,428.8,448.7,464.8,485.2,520.4,541.1,581.3,622.8,629.9,609.8,562.6,497.5,436.4,386.4,342.6,330.1,320.4,311.2,332.5,364.8,407.4,449.6,440.3,442.3,450.0,472.0,476.4,451.4,409.6,375.5,351.9,354.7,382.9,420.9,433.9,424.4,407.1,430.0,464.0,463.0,444.2,419.0,382.3,352.1,342.3,366.7,444.5,515.4,612.8,696.7,743.9,766.2,812.0,856.1,903.8,926.9],"5_100":[0.0,88.2,186.6,285.6,382.8,474.9,557.3,625.4,673.7,703.9,720.9,726.6,724.0,715.4,702.4,687.0,668.3,648.5,629.3,611.7,591.1,578.0,566.9,556.1,544.7,531.5,490.9,457.3,443.3,434.4,412.8,391.9,377.2,367.1,358.3,349.3,337.4,359.5,385.7,389.9,381.5,390.8,416.4,413.6,427.2,449.8,455.7,443.8,418.3,390.4,377.0,371.8,365.4,351.0,334.4,326.1,334.4,340.3,369.0,427.9,497.4,494.5,471.8,497.3,534.1,538.0,529.7,543.3,545.9,528.3,469.6,408.3,365.6,346.5,367.0,404.8,476.4,529.2,568.0,602.4,594.2,521.8,453.1,416.4,469.5,543.5,644.4,762.7,887.3,957.5,987.5,1089.2,1257.0,1463.4]},"mean":[0.0,66.7,146.4,225.4,302.0,374.2,439.3,493.9,534.3,560.0,573.2,577.0,574.4,567.6,557.6,545.1,532.5,520.0,508.8,499.6,490.9,484.0,477.9,473.7,469.7,466.0,455.3,444.2,436.3,411.2,403.6,393.8,383.2,374.5,382.8,398.8,407.0,410.7,422.4,428.2,432.0,442.2,458.8,466.6,480.7,490.9,497.8,494.5,492.8,485.0,475.9,468.7,455.4,447.8,447.3,460.3,484.7,494.0,509.0,520.6,513.9,494.6,484.0,490.9,509.6,521.8,513.1,527.1,513.2,510.7,505.9,515.6,520.0,525.0,540.2,572.4,606.7,600.1,601.0,565.5,599.2,595.2,567.4,566.4,579.7,592.1,674.4,755.6,818.1,853.7,869.7,931.1,990.6,1045.9],"std":[0.0,18.3,35.3,52.6,69.6,85.4,98.3,106.8,109.9,109.3,106.9,103.5,100.1,96.9,94.2,92.0,90.1,89.1,88.4,87.7,86.7,88.5,91.4,93.3,94.5,95.5,92.4,81.2,68.1,59.2,46.5,32.9,23.9,32.2,29.6,31.5,41.8,36.0,31.4,31.8,37.7,38.9,44.7,51.9,63.3,75.1,85.4,85.4,87.4,97.9,101.1,98.5,98.6,95.9,100.5,119.0,135.3,136.7,131.3,105.0,83.3,64.9,33.4,15.7,48.3,76.6,99.7,148.6,153.3,157.8,139.4,126.4,120.6,124.5,130.4,134.2,131.7,124.8,120.4,91.7,134.7,171.9,196.0,222.9,204.8,170.7,190.2,185.6,192.8,194.7,194.0,202.6,217.6,266.4]},"Serija_10":{"orig":"Serija_10_excel podaci.csv","specimens":{"10_1":[0.0,44.0,103.1,160.8,216.9,267.8,314.7,356.2,388.7,412.2,426.0,430.7,431.6,428.3,422.9,416.0,406.2,395.7,385.2,375.4,364.4,355.0,345.8,336.4,328.4,320.8,306.2,292.2,280.7,276.4,272.5,267.7,262.7,256.3,250.5,244.8,285.5,327.2,355.5,361.4,356.4,351.8,340.5,334.6,349.8,366.9,362.8,344.3,329.5,337.3,381.2,418.2,458.0,479.7,495.1,504.1,559.2,585.0,592.8,580.2,579.3,549.3,506.0,458.8,406.1,398.7,386.4,375.0,410.2,421.9,450.0,469.3,518.5,562.9,590.3,634.9,577.6,593.2,665.8,726.1,807.6,887.3,916.1,902.5,920.3,951.2,936.2,991.6,1032.6,1036.9,989.4,940.2,948.2,990.4],"10_5":[0.0,61.5,135.9,211.1,282.6,350.6,413.0,466.5,508.1,535.8,548.9,552.3,548.5,539.8,527.9,513.7,496.8,481.6,467.9,455.5,443.2,432.1,421.4,410.9,399.2,390.5,364.1,343.1,326.2,319.4,317.8,319.6,313.3,321.6,377.5,409.2,411.3,446.6,465.0,466.4,458.0,428.6,399.1,388.8,418.0,465.9,486.8,510.5,514.0,518.7,521.9,492.0,542.7,626.9,704.6,721.3,703.2,668.0,607.7,548.8,506.8,464.4,457.1,472.9,481.3,487.3,527.6,539.7,496.9,430.7,389.0,427.3,487.6,554.6,618.9,634.5,636.0,656.3,690.2,752.7,799.4,814.5,831.9,833.6,786.5,809.0,969.1,1127.2,1247.8,1361.2,1484.0,1601.3,1702.9,1786.7],"10_10":[0.0,55.4,124.4,193.8,261.0,324.4,383.4,434.1,473.4,503.1,520.3,528.7,530.3,527.2,521.6,513.1,503.4,491.4,477.4,461.1,444.7,422.8,402.8,385.3,369.1,356.9,333.3,309.5,288.7,268.1,255.5,246.3,258.6,317.9,368.4,389.9,394.4,395.7,410.0,407.9,398.3,402.7,418.4,438.2,463.8,475.8,483.9,505.5,506.7,488.8,473.7,470.4,442.9,406.9,397.1,384.1,381.9,419.8,472.6,530.1,605.5,641.0,609.4,532.7,468.9,459.8,519.2,603.7,663.4,527.1,456.9,522.8,534.0,521.6,559.2,598.8,637.6,691.9,769.3,815.2,799.2,749.3,700.8,676.3,688.5,748.9,859.6,957.3,1064.0,1170.1,1280.3,1341.3,1369.9,1437.3],"10_25":[0.0,56.8,130.2,203.3,273.5,339.1,398.9,450.2,490.7,519.2,536.3,543.3,542.8,537.5,530.3,521.5,512.6,502.9,492.9,482.5,472.6,461.6,450.7,438.7,427.0,415.3,386.2,361.2,341.9,328.7,325.7,333.1,348.6,394.2,452.4,453.3,439.9,434.4,448.1,474.7,482.5,488.5,490.4,491.4,498.5,523.0,554.9,590.3,607.7,609.7,598.1,590.2,599.8,592.1,579.7,569.8,563.3,560.1,548.3,535.3,563.4,601.9,604.0,596.7,580.3,597.6,607.1,590.3,609.5,628.1,633.3,634.2,630.9,626.2,607.3,642.0,669.1,740.3,833.2,881.4,937.2,993.9,1049.6,1086.9,1059.8,1042.0,1011.3,831.5,795.4,904.5,975.0,1116.1,1195.6,1312.2],"10_50":[0.0,60.4,136.5,211.2,283.8,352.6,416.7,471.5,515.9,545.1,562.0,569.9,571.8,568.5,562.9,555.6,546.6,536.5,527.5,517.0,506.7,497.3,487.1,477.2,467.9,458.9,438.7,420.8,400.8,382.8,365.7,354.3,350.7,355.5,364.1,393.8,414.4,422.8,453.1,473.5,480.2,489.3,495.4,493.2,480.8,461.8,448.1,438.8,442.3,462.4,482.5,491.6,506.2,560.8,636.0,660.3,655.9,640.0,619.7,595.9,568.9,543.0,521.9,513.5,504.4,507.4,540.3,600.4,650.1,685.9,722.6,739.4,786.8,815.8,814.5,822.5,840.7,835.4,711.5,617.2,538.4,465.1,410.8,471.6,537.8,606.9,702.7,823.4,918.2,1004.2,1130.5,1145.7,1095.7,1043.9],"10_100":[0.0,72.8,159.8,246.7,330.0,408.7,479.0,537.3,579.3,604.0,613.8,603.8,589.5,581.1,572.3,563.6,554.9,545.5,536.0,526.9,517.5,508.3,500.8,493.8,487.9,483.0,473.1,486.9,451.1,432.3,378.6,375.8,378.3,403.7,465.3,512.2,527.4,525.4,525.9,509.7,471.8,462.2,496.5,529.3,550.7,551.5,553.9,547.6,541.2,539.5,519.7,498.7,499.4,495.7,494.0,504.9,536.6,592.9,626.5,618.9,575.7,558.1,555.7,547.6,545.0,504.6,519.3,559.4,565.4,564.0,616.5,668.6,705.0,703.9,677.6,670.7,654.0,710.3,789.6,821.2,833.1,792.9,855.9,862.1,729.5,654.2,653.3,692.7,673.4,629.5,750.9,851.1,976.0,1168.8]},"mean":[0.0,58.5,131.6,204.5,274.6,340.5,400.9,452.6,492.7,519.9,534.6,538.1,535.8,530.4,523.0,513.9,503.4,492.3,481.2,469.7,458.2,446.2,434.8,423.7,413.3,404.2,383.6,369.0,348.2,334.6,319.3,316.1,318.7,341.5,379.7,400.5,412.1,425.3,442.9,448.9,441.2,437.2,440.1,445.9,460.2,474.1,481.7,489.5,490.2,492.7,496.2,493.5,508.2,527.0,551.1,557.4,566.7,577.7,577.9,568.2,566.6,559.6,542.4,520.3,497.7,492.6,516.6,544.7,565.9,542.9,544.7,576.9,610.5,630.9,644.6,667.2,669.2,704.6,743.3,769.0,785.8,783.8,794.2,805.5,787.0,802.0,855.4,903.9,955.2,1017.7,1101.7,1165.9,1214.7,1289.9],"std":[0.0,9.4,18.5,27.9,36.7,45.7,53.3,58.9,62.4,63.0,62.0,58.6,55.3,54.0,53.1,52.6,53.1,53.6,54.2,54.5,55.3,56.2,57.4,58.8,60.2,61.2,63.2,73.1,66.3,63.2,49.0,50.1,49.5,54.9,77.0,89.2,78.0,64.9,56.9,54.1,51.9,53.9,64.6,73.5,69.4,63.4,71.9,87.0,95.2,91.2,71.4,55.8,57.4,81.2,111.1,121.0,111.1,86.7,58.6,35.8,32.7,59.8,59.1,50.6,61.0,65.3,71.9,86.8,97.5,105.5,130.8,122.5,118.2,111.3,91.9,79.4,89.6,81.6,64.4,92.4,132.1,178.1,219.6,210.1,182.9,168.9,146.9,152.8,204.8,247.1,257.1,273.2,284.6,294.6]},"Serija_25":{"orig":"Serija_25_excel podaci.csv","specimens":{"25_1":[0.0,58.3,135.1,210.6,282.0,349.2,410.5,463.8,505.2,532.4,543.3,540.0,524.6,495.6,459.1,440.7,427.8,413.0,400.0,390.5,383.1,378.7,374.1,371.0,368.9,367.5,352.6,347.7,355.0,366.2,392.3,442.4,490.4,492.9,462.7,422.6,384.1,356.5,349.0,348.1,347.0,345.4,345.6,349.1,282.6,290.7,300.6,307.7,315.4,327.8,337.7,341.6,344.3,357.4,389.8,419.0,436.8,446.2,442.2,443.5,453.3,462.4,465.6,468.7,479.1,505.2,538.4,580.9,574.2,571.1,574.1,618.3,661.5,682.0,687.9,687.9,685.0,682.8,690.5,704.4,706.0,701.6,703.0,743.0,852.2,944.8,995.9,1064.2,1160.7,1234.0,1314.5,1364.9,1302.8,1205.8],"25_5":[0.0,75.3,166.7,256.9,343.3,424.6,497.9,559.0,601.4,624.3,629.1,621.8,604.7,580.4,548.0,518.1,498.3,483.2,472.2,461.4,451.6,441.4,431.7,422.4,415.0,410.1,405.6,408.9,416.2,426.0,434.8,436.5,431.6,449.0,468.7,483.3,494.8,496.8,522.4,524.1,506.1,490.9,481.7,466.5,445.9,438.3,436.8,437.6,440.8,447.5,451.4,473.0,495.1,504.0,490.3,415.7,414.6,402.7,434.0,449.2,433.3,420.9,411.9,415.6,431.2,453.0,484.9,519.2,563.3,614.4,649.6,673.0,685.5,699.3,702.3,698.8,701.7,724.9,731.4,722.2,719.8,714.7,699.7,710.8,741.8,779.3,826.1,906.3,990.6,1043.9,1080.9,1144.0,1218.7,1326.3],"25_10":[0.0,80.4,175.1,268.0,358.3,443.0,518.7,580.6,621.8,643.3,646.6,637.3,622.4,603.9,584.5,566.9,549.6,534.3,519.8,505.2,488.0,473.4,462.5,454.7,445.7,439.1,426.3,418.9,407.2,399.2,393.1,365.4,356.8,349.2,342.9,334.9,336.1,341.2,366.0,380.1,384.3,384.8,378.9,380.3,391.1,393.9,403.5,415.9,422.3,431.8,445.0,456.1,481.2,505.3,521.9,541.0,551.0,547.9,518.7,474.6,442.7,424.0,413.7,420.6,455.6,522.2,584.2,628.0,653.3,669.8,651.0,626.0,729.5,847.3,800.6,817.8,882.3,920.3,934.8,917.1,897.0,883.4,891.3,887.5,896.9,982.5,1049.0,1076.5,1092.4,1018.0,977.6,1051.9,1126.3,1309.7],"25_25":[0.0,88.0,190.5,290.9,387.8,477.0,554.7,613.2,646.6,657.0,650.8,637.9,622.2,606.0,590.6,574.4,559.4,546.9,535.6,525.1,516.3,508.3,502.8,500.8,499.8,500.3,504.1,510.4,510.4,501.8,476.2,463.1,446.4,433.2,373.0,466.8,529.6,559.9,556.6,543.8,528.9,517.6,511.2,503.6,523.4,530.6,533.6,549.9,562.4,523.7,490.0,493.9,510.3,512.7,509.5,524.6,530.2,503.2,546.2,621.9,650.5,613.2,608.7,586.8,541.8,504.7,494.7,484.5,498.2,575.8,638.0,673.5,701.8,698.9,696.0,711.5,752.6,819.6,816.1,830.2,727.9,752.6,785.1,802.2,832.8,835.4,895.6,1032.7,1161.6,1214.1,1221.3,1212.1,1176.6,1177.1],"25_50":[0.0,95.7,203.4,310.0,411.9,505.4,582.8,636.9,664.3,669.8,657.9,639.0,613.8,583.0,539.1,503.8,473.8,451.2,434.9,420.8,410.2,402.6,397.4,395.6,394.9,395.4,398.9,304.6,328.6,343.2,348.6,403.2,524.7,623.6,660.7,663.6,636.0,596.0,567.5,528.1,475.4,493.8,497.0,487.8,481.1,477.0,474.2,461.8,443.5,463.9,488.2,500.9,510.8,525.2,540.5,556.7,553.6,561.2,584.2,612.3,614.1,642.0,701.7,704.7,683.0,700.9,706.1,697.8,654.0,655.8,618.5,594.0,609.0,619.4,621.4,647.0,676.0,703.9,747.2,812.1,903.9,1020.1,1093.3,1159.1,1178.0,1232.7,1437.1,1605.8,1580.4,1453.8,911.9,644.2,573.8,692.1],"25_100":[0.0,99.3,208.1,318.7,424.9,524.3,613.2,681.6,723.1,737.3,726.4,693.9,650.5,611.7,577.6,548.5,522.3,499.9,479.8,462.6,447.3,434.2,423.3,414.8,409.5,405.6,402.5,406.3,413.4,427.2,496.5,567.4,622.2,606.2,575.2,544.3,521.4,503.6,484.6,459.7,423.5,421.0,462.8,512.9,528.5,605.5,679.5,688.5,688.2,670.3,654.0,654.8,678.4,679.9,676.8,676.2,678.1,666.7,638.8,608.0,579.0,607.2,630.9,648.1,634.4,638.4,652.0,648.2,633.0,623.3,563.7,487.1,419.6,386.0,432.9,491.5,545.9,623.7,734.4,857.4,935.1,995.0,1062.1,1183.3,1275.1,1307.8,1326.3,1371.9,1272.3,1189.9,1098.4,869.7,702.5,643.2]},"mean":[0.0,82.9,179.8,275.8,368.0,453.9,529.6,589.2,627.1,644.0,642.4,628.3,606.4,580.1,549.8,525.4,505.2,488.1,473.7,460.9,449.4,439.8,432.0,426.5,422.3,419.7,415.0,399.5,405.1,410.6,423.6,446.3,478.7,492.3,480.5,485.9,483.6,475.7,474.4,464.0,444.2,442.2,446.2,450.1,442.1,456.0,471.4,476.9,478.8,477.5,477.7,486.7,503.3,514.1,521.5,522.2,527.4,521.3,527.4,534.9,528.8,528.3,538.7,540.7,537.5,554.1,576.7,593.1,596.0,618.4,615.8,612.0,634.5,655.5,656.8,675.7,707.3,745.9,775.7,807.3,815.0,844.6,872.4,914.3,962.8,1013.7,1088.3,1176.2,1209.7,1192.3,1100.8,1047.8,1016.8,1059.0],"std":[0.0,15.0,27.1,39.8,52.3,63.4,71.8,74.9,72.8,66.9,59.0,49.9,42.9,43.3,49.0,49.7,49.4,50.5,50.9,50.3,48.8,46.8,46.0,45.8,45.5,45.8,49.9,70.0,62.7,55.6,56.1,68.5,90.5,105.9,120.3,111.5,108.2,104.9,95.2,83.2,71.3,69.0,67.8,68.7,93.5,109.4,128.2,129.8,129.2,113.9,102.7,100.7,106.4,102.3,92.7,97.2,94.8,93.2,80.1,87.5,96.8,103.1,124.1,123.1,102.0,94.6,88.4,80.8,61.8,40.4,38.3,68.8,112.9,151.8,123.8,106.7,109.8,106.7,88.0,81.2,107.3,141.9,173.9,208.0,212.7,213.1,242.6,260.3,203.9,156.8,149.3,257.5,301.7,309.0]},"Serija_50":{"orig":"Serija_50_excel podaci.csv","specimens":{"50_1":[0.0,44.1,100.3,155.5,208.7,258.4,304.3,342.3,371.7,392.0,404.2,408.6,408.8,403.7,396.1,389.0,381.0,374.0,367.6,361.3,354.5,348.1,344.4,342.3,340.3,338.8,339.9,346.5,356.2,366.1,374.8,376.9,370.6,366.2,349.8,345.5,360.5,391.0,421.7,434.7,440.9,434.7,435.0,450.9,447.1,439.1,434.1,404.2,372.3,373.6,425.6,459.1,499.9,519.0,517.6,519.7,495.3,446.5,413.2,416.3,432.4,457.4,483.1,525.4,564.0,609.7,659.0,671.2,650.8,704.1,763.0,793.0,835.7,871.8,888.9,885.7,876.4,818.3,808.5,801.8,792.8,791.5,761.1,772.8,830.0,947.0,1078.2,1085.2,989.5,945.8,973.2,1062.2,1134.6,1232.6],"50_5":[0.0,44.0,99.9,153.7,206.9,258.1,305.6,346.8,380.0,403.7,420.4,430.3,436.1,438.3,437.4,435.1,430.3,424.5,417.8,410.0,401.8,393.0,383.8,377.1,370.5,363.9,349.5,343.5,342.2,343.7,351.3,359.2,366.8,368.5,367.3,359.4,353.3,343.8,343.7,346.3,342.3,355.7,368.9,364.8,366.5,396.2,434.7,444.5,437.2,410.2,440.9,503.1,541.2,551.5,538.4,513.0,469.5,448.5,440.0,443.6,443.0,438.0,431.1,422.8,415.0,415.2,418.1,413.1,422.0,473.6,535.3,570.7,589.5,595.2,606.6,641.0,672.3,680.5,753.2,863.8,852.1,860.7,767.1,921.5,989.5,1035.4,1075.4,1121.0,1181.8,1291.8,1374.1,1368.0,1429.3,1495.8],"50_10":[0.0,45.3,105.6,165.6,223.1,277.6,328.3,372.2,408.0,433.6,452.2,463.0,468.5,470.2,467.8,462.3,455.6,447.6,439.4,430.7,422.9,414.8,407.1,398.5,389.7,380.9,358.8,341.3,328.0,319.5,312.9,315.3,320.1,322.6,322.4,331.3,358.1,398.8,427.6,440.2,443.5,445.0,445.4,454.1,464.5,461.5,446.4,416.5,412.9,441.4,458.2,466.6,467.9,461.4,448.4,424.9,409.5,441.6,474.2,491.8,500.1,512.9,521.9,519.5,528.6,534.4,552.2,568.1,575.5,590.4,615.1,635.3,643.3,640.5,645.2,663.1,679.6,717.0,759.0,781.3,783.1,793.1,825.2,830.0,882.3,928.6,948.7,963.9,1013.8,1090.5,1186.0,1214.1,1199.2,1256.8],"50_25":[0.0,59.5,133.7,206.8,276.1,341.7,400.3,450.2,485.2,503.9,509.8,506.7,498.8,488.4,477.0,463.7,447.2,434.3,420.9,408.5,396.5,386.1,377.4,369.0,360.3,352.4,328.3,316.6,326.1,338.9,344.7,341.6,348.8,357.6,368.8,388.8,404.2,425.2,445.8,478.1,506.9,496.0,521.3,526.2,505.8,476.2,480.0,490.8,486.5,492.1,536.6,561.0,570.6,543.3,517.4,494.9,474.0,502.5,555.1,617.2,616.8,638.0,640.8,628.8,610.9,609.5,612.5,657.5,694.3,694.0,678.3,667.6,681.3,682.0,674.0,697.1,799.0,877.3,855.1,887.5,899.3,902.5,921.3,974.6,1005.0,972.2,956.9,953.0,970.6,1063.8,1195.7,1316.6,1410.3,1448.3],"50_50":[0.0,67.7,145.3,223.4,298.5,367.8,430.4,481.1,516.4,533.3,536.9,526.0,505.1,478.0,450.0,424.4,400.4,378.4,363.2,350.3,342.0,345.0,348.4,350.3,351.4,353.5,357.0,357.6,354.3,348.0,348.5,367.1,366.1,383.2,416.0,418.2,400.0,385.0,386.7,402.4,383.0,393.3,423.6,486.5,520.9,505.0,505.1,491.8,483.7,530.8,558.0,575.0,598.9,612.3,622.3,626.8,630.3,619.7,595.3,598.7,602.8,597.1,594.1,603.4,611.8,581.8,528.3,515.4,547.1,598.6,633.4,635.6,654.2,666.7,673.3,698.1,681.4,670.4,662.8,629.3,644.2,725.9,813.2,871.8,906.1,901.3,894.5,914.6,967.2,1057.1,1168.1,1307.6,1373.2,1454.4],"50_100":[0.0,65.6,143.2,220.9,295.0,365.5,428.7,482.5,521.0,544.5,552.5,550.2,541.4,527.4,510.6,492.0,475.1,460.0,446.0,433.3,426.1,420.8,417.4,414.7,411.5,409.4,405.7,402.2,400.0,398.6,395.9,394.3,390.1,410.7,429.9,431.8,452.0,464.0,480.4,494.8,496.2,502.2,496.4,481.3,469.2,457.6,439.5,420.0,414.5,430.3,469.5,490.1,503.7,518.0,535.0,546.1,553.2,559.4,569.1,597.8,639.6,647.6,640.4,633.4,636.0,647.3,659.4,664.7,635.0,619.5,599.7,540.1,509.1,506.6,509.9,491.2,423.3,385.8,373.0,374.7,424.3,524.4,608.5,658.0,745.2,823.0,850.8,866.0,916.5,984.4,1039.4,1108.0,1215.3,1301.5]},"mean":[0.0,54.4,121.3,187.6,251.4,311.5,366.3,412.5,447.1,468.5,479.3,480.8,476.4,467.6,456.5,444.4,431.6,419.8,409.1,399.0,390.6,384.6,379.8,375.3,370.6,366.5,356.5,351.3,351.1,352.5,354.7,359.1,360.4,368.1,375.7,379.2,388.0,401.3,417.7,432.8,435.5,437.8,448.4,460.6,462.3,455.9,456.6,444.6,434.5,446.4,481.5,509.1,530.3,534.2,529.8,520.9,505.3,503.0,507.8,527.6,539.1,548.5,551.9,555.6,561.1,566.3,571.6,581.7,587.4,613.4,637.5,640.4,652.2,660.5,666.3,679.4,688.7,691.6,701.9,723.1,732.6,766.4,782.7,838.1,893.0,934.6,967.4,984.0,1006.6,1072.2,1156.1,1229.4,1293.6,1364.9],"std":[0.0,11.2,21.7,32.9,43.2,52.6,60.2,66.2,68.5,67.1,62.4,55.9,48.6,42.6,38.8,36.1,35.3,35.9,35.5,35.2,35.0,32.2,29.7,27.7,26.2,25.3,26.6,28.4,27.1,27.1,28.3,27.7,23.7,29.1,40.5,40.5,38.4,40.5,47.5,53.6,63.8,57.1,54.3,54.2,54.4,36.6,29.3,38.4,44.4,56.8,53.6,48.4,48.9,49.5,55.8,66.0,76.8,73.1,75.3,88.0,92.0,91.6,86.9,81.9,81.3,83.0,92.6,103.6,96.8,83.7,77.2,88.3,108.6,121.3,125.0,126.8,153.8,170.5,173.5,193.2,173.8,133.4,102.9,112.7,97.9,71.2,93.1,99.1,91.6,120.5,139.4,123.2,125.5,114.3]}},"metrics":[{"s":"Serija_1","id":"1_1","ds":1,"stage":1,"d0":0.82,"fb":19.3,"k":220.86,"pk1":388.99,"dpk1":2.46,"pl":405.54,"cv":23.7,"cfe":1.043,"e30":13.042,"e39":20.49,"fmax":1183.48,"dfmax":39.18,"drop":9.43,"rk":0.0,"rpk1":0.0,"rpl":0.0,"rcfe":0.0,"re39":0.0},{"s":"Serija_1","id":"1_5","ds":1,"stage":5,"d0":0.846,"fb":21.9,"k":253.01,"pk1":434.62,"dpk1":2.49,"pl":447.93,"cv":20.5,"cfe":1.031,"e30":13.586,"e39":20.885,"fmax":1313.4,"dfmax":39.13,"drop":12.3,"rk":14.6,"rpk1":11.7,"rpl":10.5,"rcfe":-1.2,"re39":1.9},{"s":"Serija_1","id":"1_10","ds":1,"stage":10,"d0":0.838,"fb":18.2,"k":281.47,"pk1":472.63,"dpk1":2.49,"pl":486.72,"cv":14.1,"cfe":1.03,"e30":15.117,"e39":25.095,"fmax":1542.35,"dfmax":39.16,"drop":7.61,"rk":27.4,"rpk1":21.5,"rpl":20.0,"rcfe":-1.2,"re39":22.5},{"s":"Serija_1","id":"1_25","ds":1,"stage":25,"d0":0.82,"fb":19.0,"k":317.99,"pk1":492.7,"dpk1":2.05,"pl":462.21,"cv":15.7,"cfe":0.938,"e30":14.642,"e39":23.157,"fmax":1459.18,"dfmax":39.18,"drop":11.6,"rk":44.0,"rpk1":26.7,"rpl":14.0,"rcfe":-10.1,"re39":13.0},{"s":"Serija_1","id":"1_50","ds":1,"stage":50,"d0":0.828,"fb":17.5,"k":380.96,"pk1":583.97,"dpk1":2.11,"pl":447.97,"cv":10.0,"cfe":0.767,"e30":14.963,"e39":21.331,"fmax":1308.39,"dfmax":39.17,"drop":6.41,"rk":72.5,"rpk1":50.1,"rpl":10.5,"rcfe":-26.5,"re39":4.1},{"s":"Serija_1","id":"1_100","ds":1,"stage":100,"d0":0.809,"fb":16.7,"k":414.03,"pk1":611.13,"dpk1":1.97,"pl":485.14,"cv":28.4,"cfe":0.794,"e30":14.484,"e39":23.521,"fmax":1412.5,"dfmax":37.8,"drop":362.57,"rk":87.5,"rpk1":57.1,"rpl":19.6,"rcfe":-23.9,"re39":14.8},{"s":"Serija_5","id":"5_1","ds":5,"stage":1,"d0":0.815,"fb":20.5,"k":269.07,"pk1":487.69,"dpk1":2.48,"pl":426.07,"cv":9.3,"cfe":0.874,"e30":12.958,"e39":18.31,"fmax":816.93,"dfmax":39.19,"drop":5.01,"rk":0.0,"rpk1":0.0,"rpl":0.0,"rcfe":0.0,"re39":0.0},{"s":"Serija_5","id":"5_5","ds":5,"stage":5,"d0":0.794,"fb":17.4,"k":287.19,"pk1":476.96,"dpk1":2.34,"pl":452.93,"cv":17.0,"cfe":0.95,"e30":14.186,"e39":21.529,"fmax":1122.38,"dfmax":38.8,"drop":18.18,"rk":6.7,"rpk1":-2.2,"rpl":6.3,"rcfe":8.7,"re39":17.6},{"s":"Serija_5","id":"5_10","ds":5,"stage":10,"d0":0.802,"fb":16.8,"k":334.73,"pk1":515.62,"dpk1":2.1,"pl":480.42,"cv":13.4,"cfe":0.932,"e30":14.967,"e39":23.304,"fmax":1215.03,"dfmax":39.2,"drop":9.16,"rk":24.4,"rpk1":5.7,"rpl":12.8,"rcfe":6.6,"re39":27.3},{"s":"Serija_5","id":"5_25","ds":5,"stage":25,"d0":0.825,"fb":21.1,"k":414.62,"pk1":604.03,"dpk1":2.07,"pl":503.66,"cv":21.2,"cfe":0.834,"e30":14.561,"e39":19.756,"fmax":783.17,"dfmax":39.17,"drop":5.01,"rk":54.1,"rpk1":23.9,"rpl":18.2,"rcfe":-4.6,"re39":7.9},{"s":"Serija_5","id":"5_50","ds":5,"stage":50,"d0":0.852,"fb":20.2,"k":452.06,"pk1":666.33,"dpk1":1.99,"pl":463.68,"cv":18.3,"cfe":0.696,"e30":13.927,"e39":19.055,"fmax":937.13,"dfmax":39.14,"drop":5.15,"rk":68.0,"rpk1":36.6,"rpl":8.8,"rcfe":-20.4,"re39":4.1},{"s":"Serija_5","id":"5_100","ds":5,"stage":100,"d0":0.8,"fb":17.3,"k":472.57,"pk1":727.14,"dpk1":2.18,"pl":409.18,"cv":13.7,"cfe":0.563,"e30":13.252,"e39":19.596,"fmax":1540.18,"dfmax":39.2,"drop":9.68,"rk":75.6,"rpk1":49.1,"rpl":-4.0,"rcfe":-35.6,"re39":7.0},{"s":"Serija_10","id":"10_1","ds":10,"stage":1,"d0":0.872,"fb":21.0,"k":263.45,"pk1":432.3,"dpk1":2.3,"pl":385.67,"cv":27.3,"cfe":0.892,"e30":11.718,"e39":19.539,"fmax":1041.36,"dfmax":36.84,"drop":21.11,"rk":0.0,"rpk1":0.0,"rpl":0.0,"rcfe":0.0,"re39":0.0},{"s":"Serija_10","id":"10_5","ds":10,"stage":5,"d0":0.871,"fb":17.1,"k":347.62,"pk1":552.88,"dpk1":2.16,"pl":468.79,"cv":23.3,"cfe":0.848,"e30":13.975,"e39":23.128,"fmax":1807.75,"dfmax":39.13,"drop":26.96,"rk":31.9,"rpk1":27.9,"rpl":21.6,"rcfe":-4.9,"re39":18.4},{"s":"Serija_10","id":"10_10","ds":10,"stage":10,"d0":0.878,"fb":17.1,"k":320.63,"pk1":530.85,"dpk1":2.31,"pl":421.58,"cv":22.2,"cfe":0.794,"e30":13.145,"e39":21.314,"fmax":1452.84,"dfmax":39.12,"drop":11.63,"rk":21.7,"rpk1":22.8,"rpl":9.3,"rcfe":-11.0,"re39":9.1},{"s":"Serija_10","id":"10_25","ds":10,"stage":25,"d0":0.871,"fb":17.5,"k":335.04,"pk1":544.26,"dpk1":2.36,"pl":501.03,"cv":18.4,"cfe":0.921,"e30":15.214,"e39":23.759,"fmax":1341.28,"dfmax":39.13,"drop":8.73,"rk":27.2,"rpk1":25.9,"rpl":29.9,"rcfe":3.3,"re39":21.6},{"s":"Serija_10","id":"10_50","ds":10,"stage":50,"d0":0.869,"fb":16.9,"k":349.15,"pk1":572.51,"dpk1":2.38,"pl":481.7,"cv":17.5,"cfe":0.841,"e30":15.377,"e39":22.273,"fmax":1157.43,"dfmax":37.81,"drop":131.72,"rk":32.5,"rpk1":32.4,"rpl":24.9,"rcfe":-5.7,"re39":14.0},{"s":"Serija_10","id":"10_100","ds":10,"stage":100,"d0":0.888,"fb":15.8,"k":407.05,"pk1":614.34,"dpk1":1.99,"pl":509.17,"cv":11.3,"cfe":0.829,"e30":15.642,"e39":22.555,"fmax":1204.54,"dfmax":39.11,"drop":7.76,"rk":54.5,"rpk1":42.1,"rpl":32.0,"rcfe":-7.1,"re39":15.4},{"s":"Serija_25","id":"25_1","ds":25,"stage":1,"d0":0.84,"fb":16.3,"k":346.22,"pk1":543.98,"dpk1":2.05,"pl":387.35,"cv":15.7,"cfe":0.712,"e30":12.721,"e39":21.121,"fmax":1365.55,"dfmax":37.97,"drop":191.31,"rk":0.0,"rpk1":0.0,"rpl":0.0,"rcfe":0.0,"re39":0.0},{"s":"Serija_25","id":"25_5","ds":25,"stage":5,"d0":0.881,"fb":16.6,"k":423.43,"pk1":629.85,"dpk1":1.97,"pl":451.42,"cv":7.5,"cfe":0.717,"e30":14.382,"e39":22.113,"fmax":1348.94,"dfmax":39.12,"drop":7.55,"rk":22.3,"rpk1":15.8,"rpl":16.5,"rcfe":0.7,"re39":4.7},{"s":"Serija_25","id":"25_10","ds":25,"stage":10,"d0":0.867,"fb":16.4,"k":442.04,"pk1":647.61,"dpk1":1.94,"pl":421.97,"cv":14.1,"cfe":0.652,"e30":14.277,"e39":23.045,"fmax":1356.51,"dfmax":39.13,"drop":8.42,"rk":27.7,"rpk1":19.1,"rpl":8.9,"rcfe":-8.4,"re39":9.1},{"s":"Serija_25","id":"25_25","ds":25,"stage":25,"d0":0.883,"fb":17.6,"k":479.44,"pk1":657.59,"dpk1":1.79,"pl":523.56,"cv":9.5,"cfe":0.796,"e30":16.01,"e39":24.406,"fmax":1223.58,"dfmax":37.58,"drop":60.14,"rk":38.5,"rpk1":20.9,"rpl":35.2,"rcfe":11.8,"re39":15.6},{"s":"Serija_25","id":"25_50","ds":25,"stage":50,"d0":0.916,"fb":16.8,"k":510.36,"pk1":670.86,"dpk1":1.73,"pl":525.63,"cv":19.5,"cfe":0.784,"e30":16.068,"e39":25.278,"fmax":1616.96,"dfmax":36.13,"drop":923.7,"rk":47.4,"rpk1":23.3,"rpl":35.7,"rcfe":10.1,"re39":19.7},{"s":"Serija_25","id":"25_100","ds":25,"stage":100,"d0":0.901,"fb":16.4,"k":525.96,"pk1":737.58,"dpk1":1.79,"pl":573.4,"cv":16.7,"cfe":0.777,"e30":16.658,"e39":25.614,"fmax":1372.66,"dfmax":36.03,"drop":743.4,"rk":51.9,"rpk1":35.6,"rpl":48.0,"rcfe":9.1,"re39":21.3},{"s":"Serija_50","id":"50_1","ds":50,"stage":1,"d0":0.942,"fb":16.4,"k":255.55,"pk1":409.87,"dpk1":2.29,"pl":426.93,"cv":14.3,"cfe":1.042,"e30":13.927,"e39":22.185,"fmax":1245.9,"dfmax":39.06,"drop":7.45,"rk":0.0,"rpk1":0.0,"rpl":0.0,"rcfe":0.0,"re39":0.0},{"s":"Serija_50","id":"50_5","ds":50,"stage":5,"d0":0.884,"fb":16.2,"k":254.57,"pk1":438.96,"dpk1":2.58,"pl":407.14,"cv":14.9,"cfe":0.928,"e30":12.436,"e39":21.595,"fmax":1497.86,"dfmax":38.91,"drop":19.25,"rk":-0.4,"rpk1":7.1,"rpl":-4.6,"rcfe":-10.9,"re39":-2.7},{"s":"Serija_50","id":"50_10","ds":50,"stage":10,"d0":0.911,"fb":17.1,"k":272.88,"pk1":470.4,"dpk1":2.58,"pl":422.76,"cv":15.5,"cfe":0.899,"e30":13.315,"e39":21.591,"fmax":1279.99,"dfmax":39.09,"drop":6.64,"rk":6.8,"rpk1":14.8,"rpl":-1.0,"rcfe":-13.7,"re39":-2.7},{"s":"Serija_50","id":"50_25","ds":50,"stage":25,"d0":0.95,"fb":17.1,"k":340.02,"pk1":510.31,"dpk1":2.01,"pl":479.64,"cv":20.2,"cfe":0.94,"e30":14.855,"e39":23.867,"fmax":1449.93,"dfmax":39.05,"drop":10.01,"rk":33.1,"rpk1":24.5,"rpl":12.3,"rcfe":-9.8,"re39":7.6},{"s":"Serija_50","id":"50_50","ds":50,"stage":50,"d0":0.946,"fb":17.0,"k":367.6,"pk1":537.94,"dpk1":1.97,"pl":488.49,"cv":21.0,"cfe":0.908,"e30":14.697,"e39":22.822,"fmax":1462.71,"dfmax":39.05,"drop":9.36,"rk":43.8,"rpk1":31.2,"rpl":14.4,"rcfe":-12.9,"re39":2.9},{"s":"Serija_50","id":"50_100","ds":50,"stage":100,"d0":0.927,"fb":17.1,"k":363.57,"pk1":553.45,"dpk1":2.06,"pl":490.59,"cv":16.2,"cfe":0.886,"e30":14.792,"e39":21.397,"fmax":1311.35,"dfmax":39.07,"drop":11.84,"rk":42.3,"rpk1":35.0,"rpl":14.9,"rcfe":-15.0,"re39":-3.6}],"stages":{"1":{"n":5,"datasets":"1,5,10,25,50","mean":[0.0,46.0,105.7,164.6,221.7,274.8,324.3,367.6,402.9,428.1,443.2,448.9,447.9,439.9,427.5,416.9,406.3,394.4,383.5,374.7,366.2,358.7,351.7,347.1,344.5,342.8,338.3,335.7,336.0,339.0,345.8,357.6,367.3,370.2,365.0,359.8,364.4,366.2,371.5,375.7,380.0,385.3,385.7,386.4,375.9,377.7,377.3,371.4,366.1,375.7,399.4,414.4,431.7,447.6,462.3,477.0,487.0,480.2,474.0,477.8,484.8,489.5,492.3,502.6,516.4,543.8,563.5,580.0,575.3,579.0,598.1,619.8,647.5,663.9,668.9,681.1,669.7,665.4,698.3,732.2,756.5,757.2,729.8,724.7,753.8,802.8,847.1,896.3,939.5,973.4,1003.4,1030.4,1049.8,1076.8],"std":[0.0,7.2,17.9,28.1,37.1,45.6,53.0,59.6,64.0,66.5,65.7,62.3,56.7,48.2,40.1,35.6,32.5,28.3,25.4,24.8,25.7,27.0,27.9,30.1,31.3,32.0,33.3,37.0,39.9,42.3,49.5,65.2,82.5,84.1,76.5,70.0,47.6,33.3,42.4,52.5,61.8,67.7,74.2,76.6,81.9,71.8,64.4,51.8,46.2,44.1,39.7,44.1,57.5,60.2,49.5,43.6,54.3,69.9,82.1,76.7,73.7,56.2,39.9,46.4,78.0,99.2,124.6,141.4,130.2,133.6,141.5,138.0,129.0,127.6,130.5,120.3,123.5,91.9,82.1,78.4,66.7,94.6,144.4,161.8,194.4,232.0,247.8,234.6,212.5,211.6,220.4,222.0,196.9,182.2],"stats":{"k_m":271.0,"k_s":46.0,"k_rel":0.0,"pk1_m":452.6,"pk1_s":63.0,"pk1_rel":0.0,"dpk1_m":2.32,"dpk1_s":0.17,"pl_m":406.3,"pl_s":20.0,"pl_rel":0.0,"cfe_m":0.913,"cfe_s":0.138,"cfe_rel":0.0,"e30_m":12.87,"e30_s":0.79,"e30_rel":0.0,"e39_m":20.33,"e39_s":1.48,"e39_rel":0.0,"fmax_m":1130.6,"fmax_s":210.7}},"5":{"n":5,"datasets":"1,5,10,25,50","mean":[0.0,55.0,122.8,190.0,254.9,316.5,372.9,421.4,458.8,483.7,497.0,501.8,499.8,493.4,482.7,471.3,460.3,450.3,441.0,431.9,422.9,413.6,404.5,396.1,388.9,382.9,369.7,361.9,358.2,358.7,362.0,363.2,359.2,355.3,388.1,409.3,421.7,433.0,442.5,441.9,432.8,423.5,414.5,407.6,408.1,427.0,438.5,443.1,443.2,440.8,459.3,489.2,520.3,548.3,567.2,566.7,554.7,538.1,524.9,518.6,503.8,489.3,472.1,459.0,479.7,494.0,513.3,550.3,542.1,553.7,563.0,587.9,606.1,623.1,638.4,637.3,637.9,637.4,667.5,713.7,743.3,774.4,759.2,792.9,815.1,854.6,924.2,1004.0,1063.8,1131.4,1178.3,1236.5,1321.5,1407.0],"std":[0.0,13.3,28.8,44.1,58.2,71.2,82.6,91.3,95.5,95.4,90.6,83.7,74.8,64.5,53.0,43.0,36.4,31.9,29.0,26.7,24.7,23.1,21.9,20.2,18.2,17.9,21.4,27.3,34.3,40.4,45.1,46.9,48.7,57.1,46.0,46.3,53.5,59.0,66.8,65.8,60.5,47.9,42.0,37.9,29.3,26.5,28.6,40.6,42.3,46.6,35.3,11.2,22.8,50.4,83.3,113.9,113.9,109.5,82.3,67.0,69.6,77.3,61.5,39.2,61.3,72.5,73.1,114.7,87.9,95.9,106.3,97.7,77.7,58.0,38.9,38.4,51.2,75.3,91.2,115.8,93.4,68.3,50.6,85.7,99.7,110.2,104.2,113.9,147.4,181.8,236.1,245.3,246.6,250.5],"stats":{"k_m":313.2,"k_s":72.6,"k_rel":15.0,"pk1_m":506.7,"pk1_s":83.6,"pk1_rel":12.1,"dpk1_m":2.31,"dpk1_s":0.25,"pl_m":445.6,"pl_s":23.0,"pl_rel":10.0,"cfe_m":0.895,"cfe_s":0.119,"cfe_rel":-1.5,"e30_m":13.71,"e30_s":0.77,"e30_rel":7.0,"e39_m":21.85,"e39_s":0.84,"e39_rel":8.0,"fmax_m":1418.1,"fmax_s":255.6}},"10":{"n":5,"datasets":"1,5,10,25,50","mean":[0.0,58.5,129.4,200.3,268.9,333.5,392.7,442.8,480.3,505.1,518.2,522.5,520.9,515.5,507.2,497.5,486.6,475.6,464.4,452.8,441.2,429.1,419.1,410.9,402.6,395.8,382.3,373.5,367.2,359.7,357.0,351.9,350.0,360.2,370.8,387.1,398.0,401.7,418.9,427.8,430.3,433.8,436.7,445.0,454.5,456.0,454.2,453.7,455.0,460.7,474.0,488.2,491.5,491.7,499.2,505.7,509.1,517.4,525.3,521.6,524.9,527.3,524.1,513.4,508.3,532.1,575.6,623.0,658.3,647.5,635.9,643.7,659.2,678.7,687.6,715.0,752.1,779.8,804.5,762.1,799.2,822.9,855.1,884.1,907.3,957.5,1037.2,1080.0,1130.4,1144.5,1172.1,1234.8,1271.9,1341.4],"std":[0.0,13.4,27.6,40.9,54.0,66.2,76.1,83.2,85.4,83.8,78.1,70.3,62.5,55.0,48.7,44.0,40.3,37.5,34.8,31.9,27.6,24.9,24.6,26.3,28.4,30.6,36.7,46.1,56.3,63.6,70.3,72.5,62.9,43.3,40.5,53.5,52.5,39.5,33.2,33.1,36.9,38.4,39.5,40.4,37.9,37.9,32.7,38.0,42.5,36.6,28.7,33.2,45.0,69.7,85.8,99.2,106.4,87.6,64.7,49.3,61.3,84.2,75.7,60.9,45.6,46.2,39.8,40.3,50.8,87.0,111.8,82.1,82.2,121.7,91.6,85.8,101.2,94.5,76.3,141.2,69.1,67.9,114.0,155.7,167.2,205.7,194.1,168.0,130.9,111.4,128.2,134.5,155.7,127.5],"stats":{"k_m":330.4,"k_s":67.6,"k_rel":21.6,"pk1_m":527.4,"pk1_s":72.2,"pk1_rel":16.8,"dpk1_m":2.28,"dpk1_s":0.27,"pl_m":446.7,"pl_s":33.7,"pl_rel":10.0,"cfe_m":0.861,"cfe_s":0.144,"cfe_rel":-5.5,"e30_m":14.16,"e30_s":0.91,"e30_rel":10.3,"e39_m":22.87,"e39_s":1.52,"e39_rel":13.1,"fmax_m":1369.3,"fmax_s":131.2}},"25":{"n":5,"datasets":"1,5,10,25,50","mean":[0.0,67.0,148.8,229.4,306.6,378.7,443.2,495.7,532.0,551.9,558.5,556.0,548.6,538.6,528.0,516.3,504.4,493.8,483.5,473.9,465.3,457.4,451.1,446.1,441.4,437.7,428.0,419.8,412.3,384.7,379.1,375.4,377.7,389.8,389.6,418.3,435.6,448.0,459.7,470.2,477.2,478.5,492.5,496.6,503.3,503.9,518.4,532.1,541.5,539.1,536.2,535.7,538.6,528.9,521.8,524.0,531.8,536.9,564.4,598.4,613.4,618.7,607.7,586.4,554.1,527.7,513.4,509.5,536.0,580.8,611.7,642.0,672.4,675.3,669.2,698.1,739.7,771.2,783.5,803.2,794.8,801.1,812.1,823.2,829.5,833.3,854.6,870.0,924.8,989.2,1027.9,1095.1,1161.1,1222.9],"std":[0.0,14.2,28.0,41.2,54.3,65.8,74.7,78.9,77.8,73.0,66.7,62.7,59.6,57.6,55.6,54.2,54.1,53.8,54.2,54.7,56.0,57.4,58.5,60.3,62.6,66.0,77.5,83.3,81.4,69.5,58.8,52.7,42.6,34.4,39.0,39.6,56.2,64.7,59.1,54.3,53.6,39.7,24.0,20.7,26.1,36.8,55.0,68.7,87.0,99.1,100.4,90.9,82.2,70.9,53.1,43.1,52.6,51.8,56.7,52.9,35.5,14.5,42.7,67.4,73.6,81.5,97.9,120.0,137.4,148.1,146.9,142.7,147.4,127.2,103.3,83.2,84.3,119.3,127.0,152.0,179.5,192.8,212.0,234.7,233.5,220.2,183.2,154.2,195.1,219.0,248.0,251.0,259.6,274.1],"stats":{"k_m":377.4,"k_s":68.0,"k_rel":39.4,"pk1_m":561.8,"pk1_s":68.4,"pk1_rel":24.4,"dpk1_m":2.06,"dpk1_s":0.2,"pl_m":494.0,"pl_s":23.6,"pl_rel":21.9,"cfe_m":0.886,"cfe_s":0.066,"cfe_rel":-1.9,"e30_m":15.06,"e30_s":0.59,"e30_rel":17.4,"e39_m":22.99,"e39_s":1.86,"e39_rel":13.1,"fmax_m":1251.4,"fmax_s":278.7}},"50":{"n":5,"datasets":"1,5,10,25,50","mean":[0.0,75.3,162.8,250.0,333.9,412.4,481.8,537.4,575.5,595.5,601.0,595.9,583.9,567.2,546.7,527.2,509.4,494.1,482.3,471.8,464.1,460.0,456.6,454.2,451.8,449.9,443.8,416.0,409.8,403.6,395.5,397.6,421.6,449.1,466.6,470.2,459.5,445.8,451.5,455.7,447.5,459.1,470.8,482.5,493.7,494.0,492.4,483.1,475.1,484.1,492.6,494.4,498.3,511.5,525.0,523.4,524.3,520.9,519.1,530.6,528.0,532.1,547.2,563.1,568.3,569.4,570.1,580.9,588.4,610.5,623.0,631.9,654.0,665.1,669.2,685.2,688.0,665.9,632.9,607.9,608.2,623.6,644.7,693.1,737.0,774.3,852.0,931.5,975.0,1006.2,972.7,987.6,1012.6,1076.2],"std":[0.0,14.1,27.7,41.1,53.7,64.7,71.5,73.0,69.4,64.2,58.0,54.7,54.8,58.3,63.7,69.4,76.0,82.4,86.6,90.5,93.2,92.8,92.9,93.8,94.7,95.2,91.7,101.0,82.7,71.2,59.8,36.8,69.8,105.7,113.9,109.9,99.5,85.2,69.1,48.3,40.3,44.0,46.9,49.4,64.6,81.0,85.3,76.5,52.0,29.9,43.5,68.5,94.6,107.2,126.7,140.8,134.1,122.8,111.4,100.2,94.1,91.7,102.9,92.4,83.1,95.6,118.5,140.2,148.6,154.0,146.5,138.3,146.3,158.7,171.7,162.9,142.9,133.7,119.3,141.5,191.0,260.4,309.2,321.7,301.0,294.4,346.7,393.8,360.2,285.6,165.7,256.2,296.7,295.3],"stats":{"k_m":412.0,"k_s":67.4,"k_rel":52.9,"pk1_m":606.3,"pk1_s":59.3,"pk1_rel":34.8,"dpk1_m":2.04,"dpk1_s":0.24,"pl_m":481.5,"pl_s":29.3,"pl_rel":18.9,"cfe_m":0.799,"cfe_s":0.08,"cfe_rel":-11.1,"e30_m":15.01,"e30_s":0.8,"e30_rel":17.1,"e39_m":22.15,"e39_s":2.26,"e39_rel":8.9,"fmax_m":1296.5,"fmax_s":264.1}},"100":{"n":5,"datasets":"1,5,10,25,50","mean":[0.0,80.3,172.2,264.6,353.6,437.8,512.9,574.2,616.3,638.9,644.8,636.0,618.9,598.2,574.2,554.8,536.8,520.1,504.7,490.9,478.4,468.7,448.7,440.1,434.5,429.6,418.0,411.0,398.1,385.9,397.8,418.7,437.1,451.7,466.3,471.8,473.9,472.3,474.2,465.2,443.1,434.7,453.9,467.0,475.7,495.9,518.6,526.8,524.4,519.8,520.7,515.6,514.8,510.3,505.6,500.8,504.3,512.0,522.3,543.4,570.2,596.4,615.0,633.9,642.7,619.7,604.1,602.5,586.2,571.4,547.0,515.5,496.6,481.3,495.6,511.7,534.9,575.1,641.0,690.8,710.3,734.5,776.0,810.6,837.4,869.6,913.6,978.6,1005.3,1019.7,1054.5,1064.3,1097.8,1146.7],"std":[0.0,13.4,25.4,38.1,50.7,62.1,72.4,78.8,80.9,79.3,76.0,72.3,70.4,72.5,78.9,81.7,82.2,81.5,80.4,79.1,75.3,73.2,88.3,89.2,85.9,81.6,68.5,70.5,67.7,84.5,68.7,84.1,104.7,94.0,80.9,80.5,83.0,67.0,52.6,46.4,44.2,47.0,45.6,58.8,63.4,79.4,100.3,106.0,113.7,112.0,106.0,103.9,111.3,116.7,122.4,128.3,132.0,136.6,125.6,90.0,50.9,72.0,112.8,132.5,132.7,104.5,72.8,53.3,44.2,48.4,66.4,97.6,129.3,139.4,116.0,97.0,89.2,123.7,171.6,202.5,202.4,207.0,242.9,289.5,301.7,303.9,294.4,293.5,263.2,268.0,232.1,224.1,258.9,307.6],"stats":{"k_m":436.6,"k_s":63.2,"k_rel":62.4,"pk1_m":648.7,"pk1_s":80.2,"pk1_rel":43.8,"dpk1_m":2.0,"dpk1_s":0.14,"pl_m":493.5,"pl_s":58.8,"pl_rel":22.1,"cfe_m":0.77,"cfe_s":0.123,"cfe_rel":-14.5,"e30_m":14.97,"e30_s":1.28,"e30_rel":16.8,"e39_m":22.54,"e39_s":2.26,"e39_rel":11.0,"fmax_m":1368.2,"fmax_s":124.1}}},"stat_tests":{"Stiffness_N_mm":{"spearman_rho":0.7115,"spearman_p":1.0454766662859814e-05,"rel_spearman_rho":0.9029,"rel_spearman_p":8.903471088870445e-12,"log10_slope":85.705,"log10_intercept":259.698,"log10_r2":0.4844,"log10_p":1.9490628563300802e-05,"friedman_chi2":22.486,"friedman_p":0.00042319084807642126},"FirstPeak_N":{"spearman_rho":0.7115,"spearman_p":1.0454766662859814e-05,"rel_spearman_rho":0.9006,"rel_spearman_p":1.2111723260028618e-11,"log10_slope":96.052,"log10_intercept":441.786,"log10_r2":0.4898,"log10_p":1.6732081248237032e-05,"friedman_chi2":22.943,"friedman_p":0.0003461633447452606},"FirstPeakDisp_mm":{"spearman_rho":-0.5,"spearman_p":0.004901643475051903,"rel_spearman_rho":-0.5595,"rel_spearman_p":0.0013051084740392579,"log10_slope":-0.188,"log10_intercept":2.38,"log10_r2":0.2768,"log10_p":0.002824362309581641,"friedman_chi2":9.477,"friedman_p":0.09149395753558086},"PlateauMean_5_25_N":{"spearman_rho":0.6573,"spearman_p":7.930016205410077e-05,"rel_spearman_rho":0.5413,"rel_spearman_p":0.0020095720321759267,"log10_slope":45.233,"log10_intercept":410.042,"log10_r2":0.4663,"log10_p":3.212609985591847e-05,"friedman_chi2":11.743,"friedman_p":0.03848626740959349},"CFE_Pl_over_Pk1":{"spearman_rho":-0.4217,"spearman_p":0.020274226180790403,"rel_spearman_rho":-0.4102,"rel_spearman_p":0.024361101195675364,"log10_slope":-0.069,"log10_intercept":0.932,"log10_r2":0.1549,"log10_p":0.031439483226302765,"friedman_chi2":9.686,"friedman_p":0.0846462121887472},"Energy_0_30_J":{"spearman_rho":0.6574,"spearman_p":7.91047534999892e-05,"rel_spearman_rho":0.5074,"rel_spearman_p":0.0042118714113196475,"log10_slope":1.165,"log10_intercept":12.977,"log10_r2":0.4675,"log10_p":3.11390042728245e-05,"friedman_chi2":11.514,"friedman_p":0.04208465326652707},"Energy_0_39_J":{"spearman_rho":0.3394,"spearman_p":0.0665436376408537,"rel_spearman_rho":0.3334,"rel_spearman_p":0.07183497857847049,"log10_slope":1.009,"log10_intercept":20.978,"log10_r2":0.1348,"log10_p":0.045956984874641366,"friedman_chi2":7.857,"friedman_p":0.1642864942906091},"MaxForce_N":{"spearman_rho":0.1883,"spearman_p":0.31903306819516447,"rel_spearman_rho":0.243,"rel_spearman_p":0.19578585563512496,"log10_slope":66.779,"log10_intercept":1230.072,"log10_r2":0.041,"log10_p":0.28307107920209607,"friedman_chi2":6.6,"friedman_p":0.25212815077266604}}};
+
+    const SERIES_LIST = ["Serija_1", "Serija_5", "Serija_10", "Serija_25", "Serija_50"];
+    const STAGE_LIST = [1, 5, 10, 25, 50, 100];
+    const MAX_DISP = 39.0;
+    const METRIC_MAP = Object.fromEntries(DATA.metrics.map(m => [m.id, m]));
+    const METRIC_META = {
+      k: { label: "Initial Stiffness", unit: "N/mm" },
+      pk1: { label: "1st Peak Force", unit: "N" },
+      pl: { label: "Mean Plateau (5–25 mm)", unit: "N" },
+      cfe: { label: "Crush Force Efficiency", unit: "" },
+      e30: { label: "Energy (0–30 mm)", unit: "J" },
+      e39: { label: "Total Energy (0–39 mm)", unit: "J" },
+      fmax: { label: "Max Force", unit: "N" },
+      drop: { label: "Late Load Drop", unit: "N" }
+    };
+
+    const state = {
+      view: "relaxation",
+      relaxXMin: 0,
+      relaxXMax: MAX_DISP,
+      relaxShowSd: true,
+      relaxHidden: new Set(),
+      relaxHoverX: null,
+      overviewZoom: false,
+      overviewHoverX: null,
+      studioMode: "stage",
+      studioStage: "25",
+      studioSeries: "Serija_1",
+      customSet: new Set(["1_100", "5_100", "10_100", "25_100", "50_100"]),
+      studioHidden: new Set(),
+      xMin: 0,
+      xMax: MAX_DISP,
+      showPeaks: true,
+      showPlateau: true,
+      showEnergy: false,
+      stressMode: false,
+      areaMm2: 2500,
+      heightMm: 50,
+      studioHoverX: null,
+      dragStartX: null,
+      dragCurrX: null,
+      trendMetric: "k",
+      scatterPreset: "pk1,e39",
+      scatterColorBy: "stage",
+      scatterHoverId: null,
+      tblSearch: "",
+      tblSeries: "ALL",
+      tblStage: "ALL",
+      tblSortKey: "stage",
+      tblSortAsc: true
+    };
+
+    function getTheme() {
+      const cs = getComputedStyle(document.documentElement);
+      const v = (name, fb) => cs.getPropertyValue(name).trim() || fb;
+      const isLight = document.documentElement.classList.contains("light") || document.documentElement.dataset.theme === "light";
+      const pal = [
+        v("--chart-1", "#2563eb"),
+        v("--chart-2", "#ea580c"),
+        v("--chart-3", "#059669"),
+        v("--chart-4", "#dc2626"),
+        v("--chart-5", "#0891b2"),
+        v("--chart-6", "#ca8a04")
+      ];
+      return {
+        isLight,
+        bg: v("--background", isLight ? "#f8fafc" : "#0f172a"),
+        card: v("--card", isLight ? "#ffffff" : "#1e293b"),
+        fg: v("--foreground", isLight ? "#0f172a" : "#f1f5f9"),
+        muted: v("--muted-foreground", isLight ? "#64748b" : "#94a3b8"),
+        border: v("--border", isLight ? "#e2e8f0" : "#334155"),
+        primary: v("--primary", "#2563eb"),
+        warning: v("--warning", "#d97706"),
+        success: v("--success", "#16a34a"),
+        palette: pal
+      };
+    }
+
+    function stageColor(stageNum, theme) {
+      const idx = STAGE_LIST.indexOf(Number(stageNum));
+      return theme.palette[(idx >= 0 ? idx : 0) % theme.palette.length];
+    }
+
+    function computeEnergy(disp, force) {
+      const e = [0];
+      for (let i = 1; i < disp.length; i++) {
+        e.push(e[i - 1] + 0.5 * (force[i] + force[i - 1]) * (disp[i] - disp[i - 1]) / 1000.0);
+      }
+      return e;
+    }
+
+    function nearestDispIdx(xVal) {
+      let best = 0, diff = 1e9;
+      for (let i = 0; i < DATA.disp.length; i++) {
+        const d = Math.abs(DATA.disp[i] - xVal);
+        if (d < diff) { diff = d; best = i; }
+      }
+      return best;
+    }
+
+    function fmtP(p) {
+      if (p < 0.0001) return p.toExponential(2);
+      return p.toFixed(4);
+    }
+
+    function switchView(viewId) {
+      state.view = viewId;
+      document.querySelectorAll("nav [role='tab']").forEach(btn => {
+        const sel = btn.dataset.view === viewId;
+        btn.setAttribute("aria-selected", sel ? "true" : "false");
+        btn.className = sel
+          ? "nav-tab px-3.5 py-2.5 text-xs sm:text-sm font-semibold text-[var(--foreground)] cursor-pointer"
+          : "nav-tab px-3.5 py-2.5 text-xs sm:text-sm font-medium text-[var(--muted-foreground)] hover:text-[var(--foreground)] cursor-pointer";
+      });
+      ["relaxation", "overview", "studio", "analytics", "table"].forEach(v => {
+        document.getElementById(`view-${v}`).classList.toggle("hidden", v !== viewId);
+      });
+      if (viewId === "relaxation") renderRelaxationView();
+      if (viewId === "overview") renderOverview();
+      if (viewId === "studio") renderStudio();
+      if (viewId === "analytics") renderAnalytics();
+      if (viewId === "table") renderFullTable();
+    }
+
+    document.querySelectorAll("nav [role='tab']").forEach(btn => {
+      btn.onclick = () => switchView(btn.dataset.view);
+    });
+
+    // ==================== VIEW 1: RELAXATION STAGE ANALYSIS ====================
+    function renderRelaxationControls() {
+      const theme = getTheme();
+      document.querySelectorAll(".rz-btn").forEach(btn => {
+        const [a, b] = btn.dataset.rz.split(",").map(Number);
+        const active = state.relaxXMin === a && state.relaxXMax === b;
+        btn.className = active
+          ? "rz-btn px-2 py-1 rounded border border-[var(--primary)] bg-[var(--primary)] text-[var(--primary-foreground)] font-semibold cursor-pointer"
+          : "rz-btn px-2 py-1 rounded border border-[var(--border)] bg-[var(--background)] text-[var(--muted-foreground)] hover:text-[var(--foreground)] font-medium cursor-pointer";
+      });
+
+      const pills = document.getElementById("relaxStagePills");
+      pills.innerHTML = "";
+      STAGE_LIST.forEach(st => {
+        const key = String(st);
+        const off = state.relaxHidden.has(key);
+        const col = stageColor(st, theme);
+        const b = document.createElement("button");
+        b.className = `inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border font-mono cursor-pointer transition-opacity ${off ? "opacity-35 border-[var(--border)] bg-[var(--background)]" : "border-[var(--border)] bg-[var(--background)] text-[var(--foreground)]"}`;
+        b.innerHTML = `<span class="w-2.5 h-2.5 rounded-full inline-block" style="background:${col}"></span><span>Stage ${st} (n=5)</span>`;
+        b.onclick = () => {
+          if (state.relaxHidden.has(key)) state.relaxHidden.delete(key);
+          else state.relaxHidden.add(key);
+          renderRelaxationControls();
+          drawRelaxCurves();
+        };
+        pills.appendChild(b);
+      });
+    }
+
+    function drawRelaxCurves() {
+      const canvas = document.getElementById("relaxCurveCanvas");
+      const rect = canvas.getBoundingClientRect();
+      if (rect.width < 10) return;
+      const dpr = window.devicePixelRatio || 1;
+      canvas.width = Math.round(rect.width * dpr);
+      canvas.height = Math.round(rect.height * dpr);
+      const ctx = canvas.getContext("2d");
+      ctx.scale(dpr, dpr);
+
+      const W = rect.width, H = rect.height;
+      const theme = getTheme();
+      const disp = DATA.disp;
+      const xMin = state.relaxXMin, xMax = state.relaxXMax;
+      const pad = { top: 14, right: 16, bottom: 42, left: 58 };
+      const pw = W - pad.left - pad.right, ph = H - pad.top - pad.bottom;
+
+      const activeStages = STAGE_LIST.filter(st => !state.relaxHidden.has(String(st)));
+      let yMax = 100;
+      activeStages.forEach(st => {
+        const info = DATA.stages[String(st)];
+        for (let i = 0; i < disp.length; i++) {
+          if (disp[i] >= xMin && disp[i] <= xMax) {
+            const top = state.relaxShowSd ? info.mean[i] + info.std[i] : info.mean[i];
+            if (top > yMax) yMax = top;
+          }
+        }
+      });
+      yMax = Math.ceil((yMax * 1.08) / 100) * 100;
+
+      const xPx = x => pad.left + ((x - xMin) / Math.max(0.1, xMax - xMin)) * pw;
+      const yPx = y => pad.top + ph - (y / yMax) * ph;
+
+      ctx.clearRect(0, 0, W, H);
+      if (xMax > 5 && xMin < 25) {
+        ctx.fillStyle = theme.isLight ? "rgba(37,99,235,0.05)" : "rgba(96,165,250,0.07)";
+        ctx.fillRect(xPx(Math.max(5, xMin)), pad.top, xPx(Math.min(25, xMax)) - xPx(Math.max(5, xMin)), ph);
+      }
+
+      ctx.strokeStyle = theme.border; ctx.setLineDash([3, 3]);
+      ctx.font = "11.5px ui-monospace, SFMono-Regular, monospace"; ctx.fillStyle = theme.muted;
+
+      ctx.textAlign = "right"; ctx.textBaseline = "middle";
+      for (let i = 0; i <= 5; i++) {
+        const yv = (yMax / 5) * i, py = yPx(yv);
+        ctx.beginPath(); ctx.moveTo(pad.left, py); ctx.lineTo(pad.left + pw, py); ctx.stroke();
+        ctx.fillText(Math.round(yv).toString(), pad.left - 8, py);
+      }
+      const xStep = (xMax - xMin) <= 6 ? 1 : ((xMax - xMin) <= 20 ? 2 : 5);
+      ctx.textAlign = "center"; ctx.textBaseline = "top";
+      for (let xv = Math.ceil(xMin / xStep) * xStep; xv <= xMax + 1e-6; xv += xStep) {
+        const px = xPx(xv);
+        ctx.beginPath(); ctx.moveTo(px, pad.top); ctx.lineTo(px, pad.top + ph); ctx.stroke();
+        ctx.fillText(xv.toFixed(0), px, pad.top + ph + 7);
+      }
+      ctx.setLineDash([]);
+      ctx.strokeStyle = theme.muted;
+      ctx.beginPath(); ctx.moveTo(pad.left, pad.top); ctx.lineTo(pad.left, pad.top + ph); ctx.lineTo(pad.left + pw, pad.top + ph); ctx.stroke();
+
+      ctx.fillStyle = theme.fg; ctx.font = "600 12px system-ui, sans-serif";
+      ctx.textAlign = "center"; ctx.textBaseline = "bottom";
+      ctx.fillText("Displacement / Stroke [mm] (zeroed at contact 0,0)", pad.left + pw / 2, H - 3);
+      ctx.save(); ctx.translate(12, pad.top + ph / 2); ctx.rotate(-Math.PI / 2); ctx.textBaseline = "top";
+      ctx.fillText("Mean Force [N]", 0, 0);
+      ctx.restore();
+
+      ctx.save(); ctx.beginPath(); ctx.rect(pad.left, pad.top, pw, ph); ctx.clip();
+
+      if (state.relaxShowSd) {
+        activeStages.forEach(st => {
+          const info = DATA.stages[String(st)];
+          const col = stageColor(st, theme);
+          ctx.beginPath();
+          for (let i = 0; i < disp.length; i++) {
+            const px = xPx(disp[i]), py = yPx(info.mean[i] + info.std[i]);
+            if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+          }
+          for (let i = disp.length - 1; i >= 0; i--) {
+            ctx.lineTo(xPx(disp[i]), yPx(Math.max(0, info.mean[i] - info.std[i])));
+          }
+          ctx.closePath(); ctx.fillStyle = col; ctx.globalAlpha = 0.11; ctx.fill(); ctx.globalAlpha = 1.0;
+        });
+      }
+
+      activeStages.forEach(st => {
+        const info = DATA.stages[String(st)];
+        const col = stageColor(st, theme);
+        ctx.strokeStyle = col; ctx.lineWidth = 2.2;
+        ctx.beginPath();
+        for (let i = 0; i < disp.length; i++) {
+          const px = xPx(disp[i]), py = yPx(info.mean[i]);
+          if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+        }
+        ctx.stroke();
+      });
+
+      if (state.relaxHoverX !== null && state.relaxHoverX >= xMin && state.relaxHoverX <= xMax) {
+        const idx = nearestDispIdx(state.relaxHoverX);
+        const hx = disp[idx], px = xPx(hx);
+        ctx.strokeStyle = theme.muted; ctx.lineWidth = 1; ctx.setLineDash([4, 3]);
+        ctx.beginPath(); ctx.moveTo(px, pad.top); ctx.lineTo(px, pad.top + ph); ctx.stroke();
+        ctx.setLineDash([]);
+
+        const parts = [`<strong class="text-[var(--foreground)]">d = ${hx.toFixed(1)} mm</strong>`];
+        activeStages.forEach(st => {
+          const info = DATA.stages[String(st)];
+          const col = stageColor(st, theme);
+          const fv = info.mean[idx];
+          ctx.fillStyle = col; ctx.beginPath(); ctx.arc(px, yPx(fv), 4, 0, Math.PI * 2); ctx.fill();
+          ctx.strokeStyle = theme.card; ctx.lineWidth = 1.4; ctx.stroke();
+          parts.push(`<span class="inline-flex items-center gap-1"><span class="w-2 h-2 rounded-full" style="background:${col}"></span><span class="text-[var(--foreground)]">S${st}:</span> ${fv.toFixed(0)} N</span>`);
+        });
+        document.getElementById("relaxHoverBar").innerHTML = parts.join("");
+      }
+
+      ctx.restore();
+    }
+
+    function drawRelaxDeltaChart() {
+      const canvas = document.getElementById("relaxDeltaCanvas");
+      const rect = canvas.getBoundingClientRect();
+      if (rect.width < 10) return;
+      const dpr = window.devicePixelRatio || 1;
+      canvas.width = Math.round(rect.width * dpr); canvas.height = Math.round(rect.height * dpr);
+      const ctx = canvas.getContext("2d"); ctx.scale(dpr, dpr);
+
+      const W = rect.width, H = rect.height, theme = getTheme();
+      const pad = { top: 14, right: 16, bottom: 42, left: 54 };
+      const pw = W - pad.left - pad.right, ph = H - pad.top - pad.bottom;
+
+      const seriesDefs = [
+        { key: "k_rel", label: "Stiffness k", col: theme.palette[0] },
+        { key: "pk1_rel", label: "1st Peak", col: theme.palette[3] },
+        { key: "pl_rel", label: "Plateau (5–25)", col: theme.palette[2] },
+        { key: "e39_rel", label: "Energy (0–39)", col: theme.palette[1] },
+        { key: "cfe_rel", label: "CFE", col: theme.palette[4] }
+      ];
+      document.getElementById("relLegend").innerHTML = seriesDefs.map(s =>
+        `<span class="inline-flex items-center gap-1.5 text-[var(--muted-foreground)]"><span class="w-2.5 h-2.5 rounded-full" style="background:${s.col}"></span>${s.label}</span>`
+      ).join("");
+
+      const yMin = -25, yMax = 75;
+      const xPx = st => pad.left + (Math.log10(st) / 2.0) * pw;
+      const yPx = v => pad.top + ph - ((v - yMin) / (yMax - yMin)) * ph;
+
+      ctx.clearRect(0, 0, W, H);
+      ctx.strokeStyle = theme.border; ctx.setLineDash([3, 3]);
+      ctx.font = "11.5px ui-monospace, SFMono-Regular, monospace"; ctx.fillStyle = theme.muted;
+
+      ctx.textAlign = "right"; ctx.textBaseline = "middle";
+      [-20, 0, 20, 40, 60].forEach(yv => {
+        const py = yPx(yv);
+        ctx.beginPath(); ctx.moveTo(pad.left, py); ctx.lineTo(pad.left + pw, py); ctx.stroke();
+        ctx.fillText(`${yv > 0 ? "+" : ""}${yv}%`, pad.left - 7, py);
+      });
+      ctx.textAlign = "center"; ctx.textBaseline = "top";
+      STAGE_LIST.forEach(st => {
+        const px = xPx(st);
+        ctx.beginPath(); ctx.moveTo(px, pad.top); ctx.lineTo(px, pad.top + ph); ctx.stroke();
+        ctx.fillText(String(st), px, pad.top + ph + 7);
+      });
+      ctx.setLineDash([]);
+
+      ctx.strokeStyle = theme.muted; ctx.lineWidth = 1.2; ctx.setLineDash([5, 4]);
+      ctx.beginPath(); ctx.moveTo(pad.left, yPx(0)); ctx.lineTo(pad.left + pw, yPx(0)); ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.beginPath(); ctx.moveTo(pad.left, pad.top); ctx.lineTo(pad.left, pad.top + ph); ctx.lineTo(pad.left + pw, pad.top + ph); ctx.stroke();
+
+      ctx.fillStyle = theme.fg; ctx.font = "600 12px system-ui, sans-serif";
+      ctx.textAlign = "center"; ctx.textBaseline = "bottom";
+      ctx.fillText("Relaxation Stage (log scale)", pad.left + pw / 2, H - 3);
+      ctx.save(); ctx.translate(11, pad.top + ph / 2); ctx.rotate(-Math.PI / 2); ctx.textBaseline = "top";
+      ctx.fillText("Mean Δ% vs. Stage 1", 0, 0);
+      ctx.restore();
+
+      const px25 = xPx(25);
+      ctx.strokeStyle = theme.primary; ctx.lineWidth = 1; ctx.globalAlpha = 0.45;
+      ctx.beginPath(); ctx.moveTo(px25, pad.top); ctx.lineTo(px25, pad.top + ph); ctx.stroke();
+      ctx.globalAlpha = 1.0;
+
+      seriesDefs.forEach(sd => {
+        ctx.strokeStyle = sd.col; ctx.lineWidth = 2.2;
+        ctx.beginPath();
+        STAGE_LIST.forEach((st, i) => {
+          const val = DATA.stages[String(st)].stats[sd.key];
+          const px = xPx(st), py = yPx(val);
+          if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+        });
+        ctx.stroke();
+        STAGE_LIST.forEach(st => {
+          const val = DATA.stages[String(st)].stats[sd.key];
+          const px = xPx(st), py = yPx(val);
+          ctx.fillStyle = sd.col; ctx.beginPath(); ctx.arc(px, py, 4.5, 0, Math.PI * 2); ctx.fill();
+          ctx.strokeStyle = theme.card; ctx.lineWidth = 1.5; ctx.stroke();
+        });
+      });
+    }
+
+    function renderRelaxationTables() {
+      const theme = getTheme();
+      const tbody = document.getElementById("relaxStageTableBody");
+      tbody.innerHTML = STAGE_LIST.map(st => {
+        const info = DATA.stages[String(st)], s = info.stats, col = stageColor(st, theme);
+        const fmtMs = (m, sd, dec) => `${m.toFixed(dec)} ± ${sd.toFixed(dec)}`;
+        const fmtRel = r => `${r > 0 ? "+" : ""}${r.toFixed(1)}%`;
+        const isSweet = st === 25;
+        return `
+          <tr class="hover:bg-[var(--background)] transition-colors ${isSweet ? "bg-[var(--background)]" : ""}">
+            <td class="py-2.5 px-3 font-sans font-semibold text-[var(--foreground)]">
+              <span class="inline-flex items-center gap-2">
+                <span class="w-2.5 h-2.5 rounded-full" style="background:${col}"></span>
+                Stage ${st}${isSweet ? ` <span class="text-[11px] font-semibold text-[var(--primary)]">(Sweet Spot)</span>` : ""}
+              </span>
+            </td>
+            <td class="py-2.5 px-3 text-center text-[var(--muted-foreground)]">${info.n}</td>
+            <td class="py-2.5 px-3 text-right">${fmtMs(s.k_m, s.k_s, 1)}</td>
+            <td class="py-2.5 px-3 text-right font-semibold ${s.k_rel > 0 ? "text-[var(--success)]" : "text-[var(--muted-foreground)]"}">${fmtRel(s.k_rel)}</td>
+            <td class="py-2.5 px-3 text-right">${fmtMs(s.pk1_m, s.pk1_s, 1)}</td>
+            <td class="py-2.5 px-3 text-right font-semibold ${s.pk1_rel > 0 ? "text-[var(--success)]" : "text-[var(--muted-foreground)]"}">${fmtRel(s.pk1_rel)}</td>
+            <td class="py-2.5 px-3 text-right text-[var(--muted-foreground)]">${fmtMs(s.dpk1_m, s.dpk1_s, 2)}</td>
+            <td class="py-2.5 px-3 text-right ${isSweet ? "font-bold text-[var(--foreground)]" : ""}">${fmtMs(s.pl_m, s.pl_s, 1)}</td>
+            <td class="py-2.5 px-3 text-right">${fmtMs(s.cfe_m, s.cfe_s, 3)}</td>
+            <td class="py-2.5 px-3 text-right">${fmtMs(s.e30_m, s.e30_s, 2)}</td>
+            <td class="py-2.5 px-3 text-right ${isSweet ? "font-bold text-[var(--foreground)]" : ""}">${fmtMs(s.e39_m, s.e39_s, 2)}</td>
+            <td class="py-2.5 px-3 text-right">${fmtMs(s.fmax_m, s.fmax_s, 1)}</td>
+            <td class="py-2.5 px-3 text-center">
+              <button data-open-stage="${st}" class="open-stage-btn font-sans text-xs text-[var(--link)] hover:underline cursor-pointer">Studio →</button>
+            </td>
+          </tr>
+        `;
+      }).join("");
+
+      tbody.querySelectorAll(".open-stage-btn").forEach(btn => {
+        btn.onclick = () => {
+          state.studioMode = "stage"; state.studioStage = btn.dataset.openStage;
+          state.studioHidden.clear(); state.xMin = 0; state.xMax = MAX_DISP;
+          switchView("studio");
+        };
+      });
+
+      const statOrder = [
+        ["FirstPeak_N", "First Peak Force [N]", "N"],
+        ["Stiffness_N_mm", "Initial Linear Stiffness [N/mm]", "N/mm"],
+        ["PlateauMean_5_25_N", "Mean Plateau Force 5–25 mm [N]", "N"],
+        ["Energy_0_30_J", "Pre-Densification Energy 0–30 mm [J]", "J"],
+        ["FirstPeakDisp_mm", "Zeroed 1st Peak Displacement [mm]", "mm"],
+        ["CFE_Pl_over_Pk1", "Crush Force Efficiency (CFE)", ""],
+        ["Energy_0_39_J", "Total Absorbed Energy 0–39 mm [J]", "J"],
+        ["MaxForce_N", "Maximum Force [N]", "N"]
+      ];
+      document.getElementById("statTestsBody").innerHTML = statOrder.map(([k, lbl, unit]) => {
+        const t = DATA.stat_tests[k];
+        const sig = t.spearman_p < 0.001 ? "Highly significant (p < 0.001)" : (t.spearman_p < 0.05 ? "Significant (p < 0.05)" : "Not significant (p ≥ 0.05)");
+        const sigCls = t.spearman_p < 0.001 ? "text-[var(--success)] font-semibold" : (t.spearman_p < 0.05 ? "text-[var(--foreground)] font-medium" : "text-[var(--muted-foreground)]");
+        return `
+          <tr class="hover:bg-[var(--background)]">
+            <td class="py-2 px-3 font-sans font-medium text-[var(--foreground)]">${lbl}</td>
+            <td class="py-2 px-3 text-right">${t.spearman_rho >= 0 ? "+" : ""}${t.spearman_rho.toFixed(3)} <span class="text-[var(--muted-foreground)]">(${fmtP(t.spearman_p)})</span></td>
+            <td class="py-2 px-3 text-right font-semibold">${t.rel_spearman_rho >= 0 ? "+" : ""}${t.rel_spearman_rho.toFixed(3)} <span class="font-normal text-[var(--muted-foreground)]">(${fmtP(t.rel_spearman_p)})</span></td>
+            <td class="py-2 px-3 text-right">${t.log10_slope >= 0 ? "+" : ""}${t.log10_slope.toFixed(2)} ${unit}</td>
+            <td class="py-2 px-3 text-right">${t.friedman_chi2.toFixed(2)} <span class="text-[var(--muted-foreground)]">(${fmtP(t.friedman_p)})</span></td>
+            <td class="py-2 px-3 font-sans ${sigCls}">${sig}</td>
+          </tr>
+        `;
+      }).join("");
+    }
+
+    function renderRelaxationView() {
+      renderRelaxationControls();
+      renderRelaxationTables();
+      requestAnimationFrame(() => { drawRelaxCurves(); drawRelaxDeltaChart(); });
+    }
+
+    document.querySelectorAll(".rz-btn").forEach(btn => {
+      btn.onclick = () => {
+        const [a, b] = btn.dataset.rz.split(",").map(Number);
+        state.relaxXMin = a; state.relaxXMax = b;
+        renderRelaxationControls(); drawRelaxCurves();
+      };
+    });
+    document.getElementById("chkRelaxSd").onchange = e => { state.relaxShowSd = e.target.checked; drawRelaxCurves(); };
+    const rCanvas = document.getElementById("relaxCurveCanvas");
+    rCanvas.addEventListener("mousemove", e => {
+      const rect = rCanvas.getBoundingClientRect();
+      const rel = (e.clientX - rect.left - 58) / Math.max(1, rect.width - 74);
+      if (rel >= 0 && rel <= 1) { state.relaxHoverX = state.relaxXMin + rel * (state.relaxXMax - state.relaxXMin); drawRelaxCurves(); }
+    });
+    rCanvas.addEventListener("mouseleave", () => {
+      state.relaxHoverX = null;
+      document.getElementById("relaxHoverBar").textContent = "Hover over the chart to inspect exact stage mean Force [N] at any zeroed displacement [mm].";
+      drawRelaxCurves();
+    });
+
+    // ==================== VIEW 2: OVERVIEW GRID ====================
+    let overviewCanvases = [];
+
+    function initOverviewDOM() {
+      const grid = document.getElementById("overviewGrid");
+      grid.innerHTML = "";
+      overviewCanvases = [];
+      const panels = [
+        ...SERIES_LIST.map(sn => ({ id: sn, title: sn.replace("_", " "), sub: DATA.series[sn].orig, type: "series" })),
+        { id: "MEANS", title: "All 5 Datasets Mean ± 1 SD", sub: "Dataset envelope comparison (zeroed at 0,0)", type: "means" }
+      ];
+      panels.forEach(p => {
+        const card = document.createElement("div");
+        card.className = "mini-card bg-[var(--card)] border border-[var(--border)] rounded-xl p-3 space-y-2 cursor-pointer";
+        const seriesRows = p.type === "series" ? DATA.metrics.filter(m => m.s === p.id) : DATA.metrics;
+        const avgE = (seriesRows.reduce((a, b) => a + b.e39, 0) / seriesRows.length).toFixed(1);
+        const avgPk = (seriesRows.reduce((a, b) => a + b.pk1, 0) / seriesRows.length).toFixed(0);
+        card.innerHTML = `
+          <div class="flex items-start justify-between gap-2">
+            <div>
+              <h2 class="text-sm font-bold text-[var(--foreground)]">${p.title}</h2>
+              <p class="text-xs text-[var(--muted-foreground)]">${p.type === "series" ? `Mean Pk1: ${avgPk} N · Mean E: ${avgE} J` : p.sub}</p>
+            </div>
+            <span class="text-xs text-[var(--link)] font-medium shrink-0">Inspect →</span>
+          </div>
+          <div class="relative w-full h-[210px]"><canvas class="w-full h-full block"></canvas></div>
+          <div class="mini-legend flex flex-wrap gap-x-2.5 gap-y-1 text-xs font-mono text-[var(--muted-foreground)]"></div>
+        `;
+        const canvas = card.querySelector("canvas");
+        const legend = card.querySelector(".mini-legend");
+
+        canvas.addEventListener("mousemove", e => {
+          const rect = canvas.getBoundingClientRect();
+          const rel = (e.clientX - rect.left - 46) / Math.max(1, rect.width - 56);
+          const xMax = state.overviewZoom ? 5 : MAX_DISP;
+          if (rel >= 0 && rel <= 1) { state.overviewHoverX = rel * xMax; drawAllOverviewCanvases(); }
+        });
+        canvas.addEventListener("mouseleave", () => {
+          state.overviewHoverX = null;
+          document.getElementById("syncReadout").textContent = "Hover over any graph below to sweep a synchronized cursor across all 6 panels · Click any dataset card to open it in Interactive Studio.";
+          drawAllOverviewCanvases();
+        });
+        card.addEventListener("click", () => {
+          if (p.type === "series") { state.studioMode = "series"; state.studioSeries = p.id; }
+          else state.studioMode = "stage_means";
+          state.studioHidden.clear(); state.xMin = 0; state.xMax = state.overviewZoom ? 5 : MAX_DISP;
+          switchView("studio");
+        });
+        grid.appendChild(card);
+        overviewCanvases.push({ panel: p, canvas, legend });
+      });
+    }
+
+    function drawAllOverviewCanvases() {
+      const theme = getTheme();
+      const xMax = state.overviewZoom ? 5 : MAX_DISP;
+      const yMax = state.overviewZoom ? 800 : 1900;
+      const hoverIdx = state.overviewHoverX !== null ? nearestDispIdx(state.overviewHoverX) : null;
+
+      if (hoverIdx !== null) {
+        const dVal = DATA.disp[hoverIdx];
+        const parts = [`<strong class="text-[var(--foreground)]">d = ${dVal.toFixed(1)} mm</strong>`];
+        SERIES_LIST.forEach((sn, i) => {
+          const mv = DATA.series[sn].mean[hoverIdx];
+          parts.push(`<span class="inline-flex items-center gap-1"><span class="w-2 h-2 rounded-full inline-block" style="background:${theme.palette[i]}"></span>${sn.replace("_", " ")}: <strong class="text-[var(--foreground)]">${mv.toFixed(0)} N</strong></span>`);
+        });
+        document.getElementById("syncReadout").innerHTML = parts.join(" &nbsp;·&nbsp; ");
+      }
+
+      overviewCanvases.forEach(({ panel, canvas, legend }) => {
+        const rect = canvas.getBoundingClientRect();
+        if (rect.width < 10) return;
+        const dpr = window.devicePixelRatio || 1;
+        canvas.width = Math.round(rect.width * dpr); canvas.height = Math.round(rect.height * dpr);
+        const ctx = canvas.getContext("2d"); ctx.scale(dpr, dpr);
+
+        const W = rect.width, H = rect.height;
+        const pad = { top: 8, right: 10, bottom: 26, left: 46 };
+        const pw = W - pad.left - pad.right, ph = H - pad.top - pad.bottom;
+        const xPx = x => pad.left + (x / xMax) * pw;
+        const yPx = y => pad.top + ph - (y / yMax) * ph;
+
+        ctx.clearRect(0, 0, W, H);
+        ctx.strokeStyle = theme.border; ctx.setLineDash([2, 3]);
+        ctx.font = "11px ui-monospace, SFMono-Regular, monospace"; ctx.fillStyle = theme.muted;
+
+        ctx.textAlign = "right"; ctx.textBaseline = "middle";
+        (state.overviewZoom ? [0, 200, 400, 600, 800] : [0, 500, 1000, 1500]).forEach(yv => {
+          const py = yPx(yv);
+          ctx.beginPath(); ctx.moveTo(pad.left, py); ctx.lineTo(pad.left + pw, py); ctx.stroke();
+          ctx.fillText(String(yv), pad.left - 6, py);
+        });
+        ctx.textAlign = "center"; ctx.textBaseline = "top";
+        (state.overviewZoom ? [0, 1, 2, 3, 4, 5] : [0, 10, 20, 30, 39]).forEach(xv => {
+          const px = xPx(xv);
+          ctx.beginPath(); ctx.moveTo(px, pad.top); ctx.lineTo(px, pad.top + ph); ctx.stroke();
+          ctx.fillText(String(xv), px, pad.top + ph + 5);
+        });
+        ctx.setLineDash([]);
+        ctx.strokeStyle = theme.muted;
+        ctx.beginPath(); ctx.moveTo(pad.left, pad.top); ctx.lineTo(pad.left, pad.top + ph); ctx.lineTo(pad.left + pw, pad.top + ph); ctx.stroke();
+
+        ctx.save(); ctx.beginPath(); ctx.rect(pad.left, pad.top, pw, ph); ctx.clip();
+        const legendItems = [];
+        if (panel.type === "series") {
+          const specs = DATA.series[panel.id].specimens;
+          Object.keys(specs).forEach(name => {
+            const st = Number(name.split("_")[1]), col = stageColor(st, theme), arr = specs[name];
+            ctx.strokeStyle = col; ctx.lineWidth = 1.5;
+            ctx.beginPath();
+            for (let i = 0; i < DATA.disp.length; i++) {
+              if (DATA.disp[i] > xMax + 0.5) break;
+              const px = xPx(DATA.disp[i]), py = yPx(arr[i]);
+              if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+            }
+            ctx.stroke();
+            legendItems.push(`<span class="inline-flex items-center gap-1"><span class="w-2 h-2 rounded-full" style="background:${col}"></span>${name}${hoverIdx !== null ? `:${arr[hoverIdx].toFixed(0)}` : ""}</span>`);
+          });
+        } else {
+          SERIES_LIST.forEach((sn, idx) => {
+            const col = theme.palette[idx % theme.palette.length];
+            const mean = DATA.series[sn].mean, std = DATA.series[sn].std;
+            ctx.beginPath();
+            for (let i = 0; i < DATA.disp.length; i++) {
+              if (DATA.disp[i] > xMax + 0.5) break;
+              const px = xPx(DATA.disp[i]), py = yPx(mean[i] + std[i]);
+              if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+            }
+            for (let i = DATA.disp.length - 1; i >= 0; i--) {
+              if (DATA.disp[i] > xMax + 0.5) continue;
+              ctx.lineTo(xPx(DATA.disp[i]), yPx(Math.max(0, mean[i] - std[i])));
+            }
+            ctx.closePath(); ctx.fillStyle = col; ctx.globalAlpha = 0.13; ctx.fill(); ctx.globalAlpha = 1.0;
+            ctx.strokeStyle = col; ctx.lineWidth = 1.8;
+            ctx.beginPath();
+            for (let i = 0; i < DATA.disp.length; i++) {
+              if (DATA.disp[i] > xMax + 0.5) break;
+              const px = xPx(DATA.disp[i]), py = yPx(mean[i]);
+              if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+            }
+            ctx.stroke();
+            legendItems.push(`<span class="inline-flex items-center gap-1"><span class="w-2 h-2 rounded-full" style="background:${col}"></span>S${sn.split("_")[1]}</span>`);
+          });
+        }
+        if (hoverIdx !== null && DATA.disp[hoverIdx] <= xMax) {
+          const px = xPx(DATA.disp[hoverIdx]);
+          ctx.strokeStyle = theme.fg; ctx.lineWidth = 1; ctx.setLineDash([3, 3]);
+          ctx.beginPath(); ctx.moveTo(px, pad.top); ctx.lineTo(px, pad.top + ph); ctx.stroke();
+          ctx.setLineDash([]);
+        }
+        ctx.restore();
+        legend.innerHTML = legendItems.join("");
+      });
+    }
+
+    function renderOverview() {
+      if (overviewCanvases.length === 0) initOverviewDOM();
+      requestAnimationFrame(drawAllOverviewCanvases);
+    }
+    document.getElementById("chkOverviewZoom").onchange = e => {
+      state.overviewZoom = e.target.checked; state.overviewHoverX = null; drawAllOverviewCanvases();
+    };
+
+    // ==================== VIEW 3: INTERACTIVE STUDIO ====================
+    function getStudioCurves() {
+      const theme = getTheme();
+      const curves = [];
+      if (state.studioMode === "stage") {
+        const targetStage = Number(state.studioStage);
+        SERIES_LIST.forEach((sn, idx) => {
+          const specId = `${sn.split("_")[1]}_${targetStage}`;
+          const arr = DATA.series[sn].specimens[specId];
+          if (arr) {
+            curves.push({
+              key: specId, label: `${sn.replace("_", " ")} (${specId})`, force: arr, std: null,
+              energy: computeEnergy(DATA.disp, arr), meta: METRIC_MAP[specId],
+              color: theme.palette[idx % theme.palette.length], dashed: false
+            });
+          }
+        });
+        const stInfo = DATA.stages[String(targetStage)];
+        if (stInfo) {
+          curves.push({
+            key: `MEAN_${targetStage}`, label: `Stage ${targetStage} Mean (n=5)`,
+            force: stInfo.mean, std: null, energy: computeEnergy(DATA.disp, stInfo.mean),
+            meta: null, color: theme.fg, dashed: true
+          });
+        }
+      } else if (state.studioMode === "series") {
+        const specs = DATA.series[state.studioSeries].specimens;
+        Object.keys(specs).forEach(name => {
+          const st = Number(name.split("_")[1]);
+          curves.push({
+            key: name, label: `${name} (Stage ${st})`, force: specs[name], std: null,
+            energy: computeEnergy(DATA.disp, specs[name]), meta: METRIC_MAP[name],
+            color: stageColor(st, theme), dashed: false
+          });
+        });
+      } else if (state.studioMode === "custom") {
+        let idx = 0;
+        DATA.metrics.forEach(m => {
+          if (state.customSet.has(m.id)) {
+            const arr = DATA.series[m.s].specimens[m.id];
+            curves.push({
+              key: m.id, label: m.id, force: arr, std: null,
+              energy: computeEnergy(DATA.disp, arr), meta: m,
+              color: theme.palette[idx % theme.palette.length], dashed: false
+            });
+            idx++;
+          }
+        });
+      } else {
+        STAGE_LIST.forEach(st => {
+          const info = DATA.stages[String(st)];
+          curves.push({
+            key: `ST_${st}`, label: `Stage ${st} Mean (n=5)`,
+            force: info.mean, std: info.std,
+            energy: computeEnergy(DATA.disp, info.mean), meta: null,
+            color: stageColor(st, theme), dashed: false
+          });
+        });
+      }
+      return curves;
+    }
+
+    function renderStudioControls() {
+      document.querySelectorAll(".smode-btn").forEach(btn => {
+        const active = btn.dataset.smode === state.studioMode;
+        btn.className = active
+          ? "smode-btn px-2 py-1.5 rounded-md border border-[var(--primary)] bg-[var(--primary)] text-[var(--primary-foreground)] font-semibold cursor-pointer"
+          : "smode-btn px-2 py-1.5 rounded-md border border-[var(--border)] bg-[var(--background)] text-[var(--muted-foreground)] hover:text-[var(--foreground)] font-medium cursor-pointer";
+      });
+      document.getElementById("panelStagePick").classList.toggle("hidden", state.studioMode !== "stage");
+      document.getElementById("panelSeriesPick").classList.toggle("hidden", state.studioMode !== "series");
+      document.getElementById("panelCustomMatrix").classList.toggle("hidden", state.studioMode !== "custom");
+
+      const stb = document.getElementById("studioStageBtns");
+      stb.innerHTML = "";
+      STAGE_LIST.forEach(st => {
+        const active = String(st) === state.studioStage;
+        const btn = document.createElement("button");
+        btn.textContent = `Stage ${st}`;
+        btn.className = active
+          ? "px-2 py-1.5 rounded-md border border-[var(--primary)] bg-[var(--primary)] text-[var(--primary-foreground)] font-semibold cursor-pointer"
+          : "px-2 py-1.5 rounded-md border border-[var(--border)] bg-[var(--background)] text-[var(--muted-foreground)] hover:text-[var(--foreground)] font-medium cursor-pointer";
+        btn.onclick = () => { state.studioStage = String(st); state.studioHidden.clear(); renderStudio(); };
+        stb.appendChild(btn);
+      });
+
+      const sb = document.getElementById("studioSeriesBtns");
+      sb.innerHTML = "";
+      SERIES_LIST.forEach(sn => {
+        const active = state.studioSeries === sn;
+        const btn = document.createElement("button");
+        btn.textContent = sn.replace("_", " ");
+        btn.className = active
+          ? "px-2.5 py-1.5 rounded-md border border-[var(--primary)] bg-[var(--primary)] text-[var(--primary-foreground)] font-semibold cursor-pointer"
+          : "px-2.5 py-1.5 rounded-md border border-[var(--border)] bg-[var(--background)] text-[var(--muted-foreground)] hover:text-[var(--foreground)] font-medium cursor-pointer";
+        btn.onclick = () => { state.studioSeries = sn; state.studioHidden.clear(); renderStudio(); };
+        sb.appendChild(btn);
+      });
+
+      if (state.studioMode === "custom") {
+        const mg = document.getElementById("customMatrixGrid");
+        mg.innerHTML = "";
+        SERIES_LIST.forEach(sn => {
+          const row = document.createElement("div"); row.className = "space-y-1";
+          const lbl = document.createElement("div"); lbl.className = "text-[11px] font-semibold text-[var(--muted-foreground)]";
+          lbl.textContent = sn.replace("_", " ");
+          const cells = document.createElement("div"); cells.className = "grid grid-cols-3 gap-1";
+          Object.keys(DATA.series[sn].specimens).forEach(specId => {
+            const on = state.customSet.has(specId);
+            const b = document.createElement("button"); b.textContent = specId;
+            b.className = on
+              ? "matrix-cell px-1.5 py-1 rounded border border-[var(--primary)] bg-[var(--primary)] text-[var(--primary-foreground)] font-mono font-semibold cursor-pointer"
+              : "matrix-cell px-1.5 py-1 rounded border border-[var(--border)] bg-[var(--background)] text-[var(--muted-foreground)] hover:text-[var(--foreground)] font-mono cursor-pointer";
+            b.onclick = () => {
+              if (state.customSet.has(specId)) state.customSet.delete(specId);
+              else state.customSet.add(specId);
+              renderStudio();
+            };
+            cells.appendChild(b);
+          });
+          row.appendChild(lbl); row.appendChild(cells); mg.appendChild(row);
+        });
+      }
+
+      document.querySelectorAll(".z-btn").forEach(btn => {
+        const [a, b] = btn.dataset.z.split(",").map(Number);
+        const active = Math.abs(state.xMin - a) < 0.05 && Math.abs(state.xMax - b) < 0.05;
+        btn.className = active
+          ? "z-btn px-2.5 py-1 rounded-md border border-[var(--primary)] bg-[var(--primary)] text-[var(--primary-foreground)] font-semibold cursor-pointer"
+          : "z-btn px-2.5 py-1 rounded-md border border-[var(--border)] bg-[var(--background)] text-[var(--muted-foreground)] hover:text-[var(--foreground)] font-medium cursor-pointer";
+      });
+      document.getElementById("btnResetZoom").classList.toggle("hidden", state.xMin === 0 && state.xMax === MAX_DISP);
+
+      const pills = document.getElementById("studioPills");
+      pills.innerHTML = "";
+      const curves = getStudioCurves();
+      if (curves.length === 0) pills.innerHTML = `<span class="text-[var(--muted-foreground)]">Select one or more specimens from the left panel to plot.</span>`;
+      curves.forEach(c => {
+        const off = state.studioHidden.has(c.key);
+        const b = document.createElement("button");
+        b.className = `inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border font-mono cursor-pointer transition-opacity ${off ? "opacity-35 border-[var(--border)] bg-[var(--background)]" : "border-[var(--border)] bg-[var(--background)] text-[var(--foreground)]"}`;
+        b.innerHTML = `<span class="w-2.5 h-2.5 rounded-full inline-block" style="background:${c.color}"></span><span>${c.label}</span>`;
+        b.onclick = () => {
+          if (state.studioHidden.has(c.key)) state.studioHidden.delete(c.key);
+          else state.studioHidden.add(c.key);
+          renderStudioControls(); drawStudioChart();
+        };
+        pills.appendChild(b);
+      });
+
+      const cardsWrap = document.getElementById("studioMetricsCards");
+      const activeMetas = curves.filter(c => !state.studioHidden.has(c.key) && c.meta);
+      cardsWrap.innerHTML = activeMetas.map(c => {
+        const m = c.meta;
+        return `
+          <div class="bg-[var(--card)] border border-[var(--border)] rounded-xl p-3 flex items-center justify-between gap-2 text-xs">
+            <div class="space-y-0.5 min-w-0">
+              <div class="flex items-center gap-1.5 font-mono font-bold text-sm text-[var(--foreground)]">
+                <span class="w-2.5 h-2.5 rounded-full shrink-0" style="background:${c.color}"></span>
+                <span>${m.id}</span>
+                <span class="text-[11px] font-sans font-normal text-[var(--muted-foreground)]">Stage ${m.stage} · d₀=${m.d0.toFixed(2)}mm</span>
+                ${m.drop > 100 ? `<span class="text-[11px] font-sans font-semibold text-[var(--warning)]">· −${m.drop.toFixed(0)} N drop</span>` : ""}
+              </div>
+              <div class="text-[var(--muted-foreground)] font-mono">
+                k=${m.k.toFixed(0)} (${m.rk >= 0 ? "+" : ""}${m.rk}%) · Pk1=${m.pk1.toFixed(0)} N · Pl=${m.pl.toFixed(0)} N
+              </div>
+            </div>
+            <div class="text-right font-mono shrink-0">
+              <div class="font-bold text-[var(--foreground)]">${m.e39.toFixed(2)} J</div>
+              <div class="text-[var(--muted-foreground)]">CFE ${m.cfe.toFixed(2)}</div>
+            </div>
+          </div>
+        `;
+      }).join("");
+    }
+
+    function drawStudioChart(exportCtx = null, exportW = 0, exportH = 0) {
+      const canvas = document.getElementById("studioCanvas");
+      let ctx, W, H;
+      if (exportCtx) { ctx = exportCtx; W = exportW; H = exportH; }
+      else {
+        const rect = canvas.getBoundingClientRect();
+        if (rect.width < 10) return;
+        const dpr = window.devicePixelRatio || 1;
+        canvas.width = Math.round(rect.width * dpr); canvas.height = Math.round(rect.height * dpr);
+        ctx = canvas.getContext("2d"); ctx.scale(dpr, dpr);
+        W = rect.width; H = rect.height;
+      }
+
+      const theme = getTheme(), disp = DATA.disp;
+      const curves = getStudioCurves().filter(c => !state.studioHidden.has(c.key));
+      const xScale = state.stressMode ? (100.0 / Math.max(1, state.heightMm)) : 1.0;
+      const yScale = state.stressMode ? (1.0 / Math.max(1, state.areaMm2)) : 1.0;
+      const xMinD = state.xMin, xMaxD = state.xMax;
+      const xMinV = xMinD * xScale, xMaxV = xMaxD * xScale;
+
+      const pad = { top: 20, right: state.showEnergy ? 64 : 22, bottom: 48, left: 64 };
+      const pw = Math.max(20, W - pad.left - pad.right), ph = Math.max(20, H - pad.top - pad.bottom);
+
+      if (exportCtx) { ctx.fillStyle = theme.card; ctx.fillRect(0, 0, W, H); }
+      else ctx.clearRect(0, 0, W, H);
+
+      let yMaxRaw = 100, eMax = 1;
+      curves.forEach(c => {
+        for (let i = 0; i < disp.length; i++) {
+          if (disp[i] >= xMinD - 0.5 && disp[i] <= xMaxD + 0.5) {
+            const top = c.std ? c.force[i] + c.std[i] : c.force[i];
+            if (top > yMaxRaw) yMaxRaw = top;
+            if (c.energy[i] > eMax) eMax = c.energy[i];
+          }
+        }
+      });
+      let yMaxV = yMaxRaw * yScale * 1.08;
+      yMaxV = state.stressMode ? (Math.ceil(yMaxV * 20) / 20) : (Math.ceil(yMaxV / 100) * 100);
+      eMax = Math.ceil(eMax * 1.12);
+
+      const xToPx = d => pad.left + ((d - xMinD) / Math.max(0.01, xMaxD - xMinD)) * pw;
+      const yToPx = f => pad.top + ph - ((f * yScale) / Math.max(1e-6, yMaxV)) * ph;
+      const eToPx = e => pad.top + ph - (e / Math.max(0.1, eMax)) * ph;
+
+      if (state.showPlateau && xMaxD > 5 && xMinD < 25) {
+        const px1 = xToPx(Math.max(5, xMinD)), px2 = xToPx(Math.min(25, xMaxD));
+        ctx.fillStyle = theme.isLight ? "rgba(37,99,235,0.06)" : "rgba(96,165,250,0.08)";
+        ctx.fillRect(px1, pad.top, px2 - px1, ph);
+      }
+
+      ctx.strokeStyle = theme.border; ctx.lineWidth = 1; ctx.setLineDash([3, 3]);
+      ctx.font = "12px ui-monospace, SFMono-Regular, monospace"; ctx.fillStyle = theme.muted;
+
+      const ySteps = 6;
+      ctx.textAlign = "right"; ctx.textBaseline = "middle";
+      for (let i = 0; i <= ySteps; i++) {
+        const yv = (yMaxV / ySteps) * i, py = pad.top + ph - (i / ySteps) * ph;
+        ctx.beginPath(); ctx.moveTo(pad.left, py); ctx.lineTo(pad.left + pw, py); ctx.stroke();
+        ctx.fillText(state.stressMode ? yv.toFixed(2) : Math.round(yv).toString(), pad.left - 8, py);
+      }
+
+      const spanV = xMaxV - xMinV;
+      const stepV = [0.2, 0.5, 1, 2, 5, 10, 20].find(s => s >= spanV / 8) || 10;
+      ctx.textAlign = "center"; ctx.textBaseline = "top";
+      for (let xv = Math.ceil(xMinV / stepV) * stepV; xv <= xMaxV + 1e-6; xv += stepV) {
+        const px = pad.left + ((xv - xMinV) / Math.max(1e-6, spanV)) * pw;
+        ctx.beginPath(); ctx.moveTo(px, pad.top); ctx.lineTo(px, pad.top + ph); ctx.stroke();
+        ctx.fillText(stepV < 1 ? xv.toFixed(1) : xv.toFixed(0), px, pad.top + ph + 8);
+      }
+      ctx.setLineDash([]);
+
+      if (state.showEnergy) {
+        ctx.textAlign = "left"; ctx.textBaseline = "middle";
+        for (let i = 0; i <= ySteps; i++) {
+          const ev = (eMax / ySteps) * i;
+          ctx.fillText(ev.toFixed(1), pad.left + pw + 8, eToPx(ev));
+        }
+      }
+
+      ctx.strokeStyle = theme.muted; ctx.lineWidth = 1.2;
+      ctx.beginPath(); ctx.moveTo(pad.left, pad.top); ctx.lineTo(pad.left, pad.top + ph); ctx.lineTo(pad.left + pw, pad.top + ph); ctx.stroke();
+
+      ctx.fillStyle = theme.fg; ctx.font = "600 12.5px system-ui, -apple-system, sans-serif";
+      ctx.textAlign = "center"; ctx.textBaseline = "bottom";
+      ctx.fillText(state.stressMode ? `Engineering Strain [%] (H₀ = ${state.heightMm} mm)` : "Displacement / Stroke [mm] (zeroed at contact 0,0)", pad.left + pw / 2, H - 5);
+
+      ctx.save(); ctx.translate(14, pad.top + ph / 2); ctx.rotate(-Math.PI / 2); ctx.textBaseline = "top";
+      ctx.fillText(state.stressMode ? `Engineering Stress [MPa] (A = ${state.areaMm2} mm²)` : "Force [N]", 0, 0);
+      ctx.restore();
+
+      if (state.showEnergy) {
+        ctx.save(); ctx.translate(W - 6, pad.top + ph / 2); ctx.rotate(Math.PI / 2); ctx.textBaseline = "top"; ctx.fillStyle = theme.muted;
+        ctx.fillText("Cumulative Energy [J] (dashed)", 0, 0);
+        ctx.restore();
+      }
+
+      ctx.save(); ctx.beginPath(); ctx.rect(pad.left, pad.top, pw, ph); ctx.clip();
+
+      curves.forEach(c => {
+        if (!c.std) return;
+        ctx.beginPath();
+        for (let i = 0; i < disp.length; i++) {
+          const px = xToPx(disp[i]), py = yToPx(c.force[i] + c.std[i]);
+          if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+        }
+        for (let i = disp.length - 1; i >= 0; i--) ctx.lineTo(xToPx(disp[i]), yToPx(Math.max(0, c.force[i] - c.std[i])));
+        ctx.closePath(); ctx.fillStyle = c.color; ctx.globalAlpha = 0.13; ctx.fill(); ctx.globalAlpha = 1.0;
+      });
+
+      curves.forEach(c => {
+        ctx.strokeStyle = c.color; ctx.lineWidth = c.dashed ? 2.5 : 2.0;
+        if (c.dashed) ctx.setLineDash([7, 4]);
+        ctx.beginPath();
+        for (let i = 0; i < disp.length; i++) {
+          const px = xToPx(disp[i]), py = yToPx(c.force[i]);
+          if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+        }
+        ctx.stroke(); ctx.setLineDash([]);
+
+        if (state.showEnergy) {
+          ctx.save(); ctx.strokeStyle = c.color; ctx.lineWidth = 1.3; ctx.globalAlpha = 0.6; ctx.setLineDash([4, 4]);
+          ctx.beginPath();
+          for (let i = 0; i < disp.length; i++) {
+            const px = xToPx(disp[i]), py = eToPx(c.energy[i]);
+            if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+          }
+          ctx.stroke(); ctx.restore();
+        }
+
+        if (state.showPeaks && c.meta && c.meta.dpk1 >= xMinD && c.meta.dpk1 <= xMaxD) {
+          const px = xToPx(c.meta.dpk1), py = yToPx(c.meta.pk1);
+          ctx.fillStyle = c.color; ctx.beginPath(); ctx.arc(px, py, 4.2, 0, Math.PI * 2); ctx.fill();
+          ctx.strokeStyle = theme.card; ctx.lineWidth = 1.5; ctx.stroke();
+        }
+      });
+
+      if (!exportCtx && state.dragStartX !== null && state.dragCurrX !== null) {
+        const p1 = xToPx(Math.min(state.dragStartX, state.dragCurrX)), p2 = xToPx(Math.max(state.dragStartX, state.dragCurrX));
+        ctx.fillStyle = theme.isLight ? "rgba(37,99,235,0.14)" : "rgba(96,165,250,0.18)";
+        ctx.fillRect(p1, pad.top, p2 - p1, ph);
+        ctx.strokeStyle = theme.primary; ctx.lineWidth = 1.2; ctx.strokeRect(p1, pad.top, p2 - p1, ph);
+      }
+
+      if (!exportCtx && state.studioHoverX !== null && state.studioHoverX >= xMinD && state.studioHoverX <= xMaxD) {
+        const idx = nearestDispIdx(state.studioHoverX), hx = disp[idx], px = xToPx(hx);
+        ctx.strokeStyle = theme.muted; ctx.lineWidth = 1; ctx.setLineDash([4, 3]);
+        ctx.beginPath(); ctx.moveTo(px, pad.top); ctx.lineTo(px, pad.top + ph); ctx.stroke();
+        ctx.setLineDash([]);
+
+        const xLbl = state.stressMode ? `ε = ${(hx * xScale).toFixed(2)}%` : `d = ${hx.toFixed(1)} mm`;
+        const parts = [`<strong class="text-[var(--foreground)]">${xLbl}</strong>`];
+        curves.forEach(c => {
+          const fv = c.force[idx], ev = c.energy[idx];
+          ctx.fillStyle = c.color; ctx.beginPath(); ctx.arc(px, yToPx(fv), 4.5, 0, Math.PI * 2); ctx.fill();
+          ctx.strokeStyle = theme.card; ctx.lineWidth = 1.5; ctx.stroke();
+          const valTxt = state.stressMode ? `${(fv * yScale).toFixed(3)} MPa` : `${fv.toFixed(1)} N`;
+          parts.push(`<span class="inline-flex items-center gap-1"><span class="w-2 h-2 rounded-full inline-block" style="background:${c.color}"></span><span class="text-[var(--foreground)]">${c.label}:</span> ${valTxt}${state.showEnergy ? ` · ${ev.toFixed(2)} J` : ""}</span>`);
+        });
+        document.getElementById("studioHoverBar").innerHTML = parts.join("");
+      }
+
+      ctx.restore();
+
+      if (exportCtx && curves.length > 0) {
+        ctx.font = "600 13px system-ui, sans-serif"; ctx.textAlign = "left"; ctx.textBaseline = "top";
+        const lx = pad.left + 14, ly = pad.top + 10;
+        curves.forEach((c, i) => {
+          ctx.fillStyle = c.color; ctx.fillRect(lx, ly + i * 20 + 4, 14, 4);
+          ctx.fillStyle = theme.fg; ctx.fillText(c.label, lx + 20, ly + i * 20);
+        });
+      }
+    }
+
+    function renderStudio() {
+      renderStudioControls();
+      requestAnimationFrame(() => drawStudioChart());
+    }
+
+    document.querySelectorAll(".smode-btn").forEach(btn => {
+      btn.onclick = () => { state.studioMode = btn.dataset.smode; state.studioHidden.clear(); renderStudio(); };
+    });
+    document.getElementById("btnCustomTop5").onclick = () => { state.customSet = new Set(["1_100", "5_100", "10_100", "25_100", "50_100"]); renderStudio(); };
+    document.getElementById("btnCustomClear").onclick = () => { state.customSet.clear(); renderStudio(); };
+    document.querySelectorAll(".z-btn").forEach(btn => {
+      btn.onclick = () => { const [a, b] = btn.dataset.z.split(",").map(Number); state.xMin = a; state.xMax = b; renderStudio(); };
+    });
+    document.getElementById("btnResetZoom").onclick = () => { state.xMin = 0; state.xMax = MAX_DISP; renderStudio(); };
+    document.getElementById("stChkPeaks").onchange = e => { state.showPeaks = e.target.checked; drawStudioChart(); };
+    document.getElementById("stChkPlateau").onchange = e => { state.showPlateau = e.target.checked; drawStudioChart(); };
+    document.getElementById("stChkEnergy").onchange = e => { state.showEnergy = e.target.checked; drawStudioChart(); };
+    document.getElementById("stChkStress").onchange = e => {
+      state.stressMode = e.target.checked;
+      document.getElementById("stressInputs").classList.toggle("hidden", !state.stressMode);
+      drawStudioChart();
+    };
+    document.getElementById("inpArea").oninput = e => { state.areaMm2 = Math.max(1, parseFloat(e.target.value) || 2500); drawStudioChart(); };
+    document.getElementById("inpHeight").oninput = e => { state.heightMm = Math.max(1, parseFloat(e.target.value) || 50); drawStudioChart(); };
+
+    const stCanvas = document.getElementById("studioCanvas");
+    function studioClientToDisp(clientX) {
+      const rect = stCanvas.getBoundingClientRect();
+      const padL = 64, padR = state.showEnergy ? 64 : 22;
+      const rel = (clientX - rect.left - padL) / Math.max(1, rect.width - padL - padR);
+      return state.xMin + Math.max(0, Math.min(1, rel)) * (state.xMax - state.xMin);
+    }
+    stCanvas.addEventListener("mousedown", e => { state.dragStartX = studioClientToDisp(e.clientX); state.dragCurrX = state.dragStartX; });
+    stCanvas.addEventListener("mousemove", e => {
+      const d = studioClientToDisp(e.clientX); state.studioHoverX = d;
+      if (state.dragStartX !== null) state.dragCurrX = d;
+      drawStudioChart();
+    });
+    window.addEventListener("mouseup", () => {
+      if (state.dragStartX !== null && state.dragCurrX !== null) {
+        const a = Math.min(state.dragStartX, state.dragCurrX), b = Math.max(state.dragStartX, state.dragCurrX);
+        if (b - a >= 0.8) { state.xMin = Math.max(0, Math.round(a * 10) / 10); state.xMax = Math.min(MAX_DISP, Math.round(b * 10) / 10); }
+        state.dragStartX = null; state.dragCurrX = null; renderStudio();
+      }
+    });
+    stCanvas.addEventListener("dblclick", () => { state.xMin = 0; state.xMax = MAX_DISP; renderStudio(); });
+    stCanvas.addEventListener("mouseleave", () => {
+      state.studioHoverX = null;
+      document.getElementById("studioHoverBar").textContent = "Move cursor across chart for exact Force [N], zeroed Displacement [mm], and Cumulative Energy [J] readouts.";
+      drawStudioChart();
+    });
+
+    document.getElementById("btnDownloadPng").onclick = () => {
+      const off = document.createElement("canvas"); off.width = 1600; off.height = 960;
+      const ctx = off.getContext("2d"); ctx.scale(2, 2);
+      drawStudioChart(ctx, 800, 480);
+      const a = document.createElement("a");
+      a.download = `voronoi_zeroed_${state.studioMode === "stage" ? "stage_" + state.studioStage : (state.studioMode === "series" ? state.studioSeries : state.studioMode)}.png`;
+      a.href = off.toDataURL("image/png"); a.click();
+    };
+
+    // ==================== VIEW 4: TRENDS & TRADE-OFFS ====================
+    let scatterPointsPx = [];
+
+    function drawTrendChart() {
+      const canvas = document.getElementById("trendCanvas");
+      const rect = canvas.getBoundingClientRect();
+      if (rect.width < 10) return;
+      const dpr = window.devicePixelRatio || 1;
+      canvas.width = Math.round(rect.width * dpr); canvas.height = Math.round(rect.height * dpr);
+      const ctx = canvas.getContext("2d"); ctx.scale(dpr, dpr);
+
+      const W = rect.width, H = rect.height, theme = getTheme();
+      const key = state.trendMetric, meta = METRIC_META[key];
+      const pad = { top: 18, right: 18, bottom: 42, left: 58 };
+      const pw = W - pad.left - pad.right, ph = H - pad.top - pad.bottom;
+
+      const vals = DATA.metrics.map(m => m[key]);
+      const span = Math.max(...vals) - Math.min(...vals) || 1;
+      const yMin = Math.max(0, Math.min(...vals) - span * 0.12), yMax = Math.max(...vals) + span * 0.12;
+      const xPx = s => pad.left + (STAGE_LIST.indexOf(s) / (STAGE_LIST.length - 1)) * pw;
+      const yPx = v => pad.top + ph - ((v - yMin) / (yMax - yMin)) * ph;
+
+      ctx.clearRect(0, 0, W, H);
+      ctx.strokeStyle = theme.border; ctx.setLineDash([3, 3]);
+      ctx.font = "11.5px ui-monospace, SFMono-Regular, monospace"; ctx.fillStyle = theme.muted;
+
+      ctx.textAlign = "right"; ctx.textBaseline = "middle";
+      for (let i = 0; i <= 5; i++) {
+        const yv = yMin + ((yMax - yMin) / 5) * i, py = yPx(yv);
+        ctx.beginPath(); ctx.moveTo(pad.left, py); ctx.lineTo(pad.left + pw, py); ctx.stroke();
+        ctx.fillText(key === "cfe" ? yv.toFixed(2) : (yv < 50 ? yv.toFixed(1) : Math.round(yv).toString()), pad.left - 8, py);
+      }
+      ctx.textAlign = "center"; ctx.textBaseline = "top";
+      STAGE_LIST.forEach(s => {
+        const px = xPx(s);
+        ctx.beginPath(); ctx.moveTo(px, pad.top); ctx.lineTo(px, pad.top + ph); ctx.stroke();
+        ctx.fillText(`S${s}`, px, pad.top + ph + 8);
+      });
+      ctx.setLineDash([]);
+      ctx.strokeStyle = theme.muted;
+      ctx.beginPath(); ctx.moveTo(pad.left, pad.top); ctx.lineTo(pad.left, pad.top + ph); ctx.lineTo(pad.left + pw, pad.top + ph); ctx.stroke();
+
+      ctx.fillStyle = theme.fg; ctx.font = "600 12px system-ui, sans-serif";
+      ctx.textAlign = "center"; ctx.textBaseline = "bottom";
+      ctx.fillText("Relaxation Stage", pad.left + pw / 2, H - 3);
+      ctx.save(); ctx.translate(12, pad.top + ph / 2); ctx.rotate(-Math.PI / 2); ctx.textBaseline = "top";
+      ctx.fillText(`${meta.label}${meta.unit ? ` [${meta.unit}]` : ""}`, 0, 0);
+      ctx.restore();
+
+      const legendHtml = [];
+      SERIES_LIST.forEach((sn, idx) => {
+        const col = theme.palette[idx % theme.palette.length];
+        const rows = DATA.metrics.filter(m => m.s === sn).sort((a, b) => a.stage - b.stage);
+        ctx.strokeStyle = col; ctx.lineWidth = 2.2;
+        ctx.beginPath();
+        rows.forEach((r, i) => { const px = xPx(r.stage), py = yPx(r[key]); if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py); });
+        ctx.stroke();
+        rows.forEach(r => {
+          const px = xPx(r.stage), py = yPx(r[key]);
+          ctx.fillStyle = col; ctx.beginPath(); ctx.arc(px, py, 4.5, 0, Math.PI * 2); ctx.fill();
+          ctx.strokeStyle = theme.card; ctx.lineWidth = 1.5; ctx.stroke();
+        });
+        legendHtml.push(`<span class="inline-flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full" style="background:${col}"></span>${sn.replace("_", " ")}</span>`);
+      });
+      document.getElementById("trendLegend").innerHTML = legendHtml.join("");
+    }
+
+    function drawScatterChart() {
+      const canvas = document.getElementById("scatterCanvas");
+      const rect = canvas.getBoundingClientRect();
+      if (rect.width < 10) return;
+      const dpr = window.devicePixelRatio || 1;
+      canvas.width = Math.round(rect.width * dpr); canvas.height = Math.round(rect.height * dpr);
+      const ctx = canvas.getContext("2d"); ctx.scale(dpr, dpr);
+
+      const W = rect.width, H = rect.height, theme = getTheme();
+      const [xk, yk] = state.scatterPreset.split(",");
+      const xm = METRIC_META[xk], ym = METRIC_META[yk];
+      const pad = { top: 18, right: 18, bottom: 42, left: 58 };
+      const pw = W - pad.left - pad.right, ph = H - pad.top - pad.bottom;
+
+      const xVals = DATA.metrics.map(m => m[xk]), yVals = DATA.metrics.map(m => m[yk]);
+      const xSpan = Math.max(...xVals) - Math.min(...xVals) || 1, ySpan = Math.max(...yVals) - Math.min(...yVals) || 1;
+      const xMin = Math.max(0, Math.min(...xVals) - xSpan * 0.1), xMax = Math.max(...xVals) + xSpan * 0.1;
+      const yMin = Math.max(0, Math.min(...yVals) - ySpan * 0.1), yMax = Math.max(...yVals) + ySpan * 0.1;
+      const xPx = v => pad.left + ((v - xMin) / (xMax - xMin)) * pw;
+      const yPx = v => pad.top + ph - ((v - yMin) / (yMax - yMin)) * ph;
+
+      ctx.clearRect(0, 0, W, H);
+      ctx.strokeStyle = theme.border; ctx.setLineDash([3, 3]);
+      ctx.font = "11.5px ui-monospace, SFMono-Regular, monospace"; ctx.fillStyle = theme.muted;
+
+      ctx.textAlign = "right"; ctx.textBaseline = "middle";
+      for (let i = 0; i <= 5; i++) {
+        const yv = yMin + ((yMax - yMin) / 5) * i, py = yPx(yv);
+        ctx.beginPath(); ctx.moveTo(pad.left, py); ctx.lineTo(pad.left + pw, py); ctx.stroke();
+        ctx.fillText(yk === "cfe" ? yv.toFixed(2) : (yv < 50 ? yv.toFixed(1) : Math.round(yv).toString()), pad.left - 8, py);
+      }
+      ctx.textAlign = "center"; ctx.textBaseline = "top";
+      for (let i = 0; i <= 5; i++) {
+        const xv = xMin + ((xMax - xMin) / 5) * i, px = xPx(xv);
+        ctx.beginPath(); ctx.moveTo(px, pad.top); ctx.lineTo(px, pad.top + ph); ctx.stroke();
+        ctx.fillText(xk === "cfe" ? xv.toFixed(2) : Math.round(xv).toString(), px, pad.top + ph + 8);
+      }
+      ctx.setLineDash([]);
+      ctx.strokeStyle = theme.muted;
+      ctx.beginPath(); ctx.moveTo(pad.left, pad.top); ctx.lineTo(pad.left, pad.top + ph); ctx.lineTo(pad.left + pw, pad.top + ph); ctx.stroke();
+
+      ctx.fillStyle = theme.fg; ctx.font = "600 12px system-ui, sans-serif";
+      ctx.textAlign = "center"; ctx.textBaseline = "bottom";
+      ctx.fillText(`${xm.label}${xm.unit ? ` [${xm.unit}]` : ""}`, pad.left + pw / 2, H - 3);
+      ctx.save(); ctx.translate(12, pad.top + ph / 2); ctx.rotate(-Math.PI / 2); ctx.textBaseline = "top";
+      ctx.fillText(`${ym.label}${ym.unit ? ` [${ym.unit}]` : ""}`, 0, 0);
+      ctx.restore();
+
+      scatterPointsPx = [];
+      DATA.metrics.forEach(m => {
+        const col = state.scatterColorBy === "stage" ? stageColor(m.stage, theme) : theme.palette[SERIES_LIST.indexOf(m.s) % theme.palette.length];
+        const px = xPx(m[xk]), py = yPx(m[yk]), hovered = state.scatterHoverId === m.id;
+        scatterPointsPx.push({ m, px, py, col });
+        ctx.fillStyle = col; ctx.globalAlpha = hovered ? 1.0 : 0.85;
+        ctx.beginPath(); ctx.arc(px, py, hovered ? 7.5 : 5.4, 0, Math.PI * 2); ctx.fill();
+        ctx.globalAlpha = 1.0; ctx.strokeStyle = hovered ? theme.fg : theme.card; ctx.lineWidth = hovered ? 2.2 : 1.4; ctx.stroke();
+
+        if (hovered) {
+          ctx.font = "600 11.5px ui-monospace, monospace"; ctx.fillStyle = theme.fg;
+          ctx.textAlign = px > pad.left + pw * 0.72 ? "right" : "left"; ctx.textBaseline = "bottom";
+          ctx.fillText(`${m.id} (S${m.stage})`, px + (px > pad.left + pw * 0.72 ? -10 : 10), py - 4);
+        }
+      });
+    }
+
+    function renderSeriesSummaryTable() {
+      const tbody = document.getElementById("seriesSummaryBody");
+      const meanStd = arr => {
+        const mu = arr.reduce((a, b) => a + b, 0) / arr.length;
+        const sd = Math.sqrt(arr.reduce((a, b) => a + (b - mu) ** 2, 0) / (arr.length - 1));
+        return [mu, sd];
+      };
+      const cols = ["k", "pk1", "dpk1", "pl", "cfe", "e30", "e39", "fmax"];
+      const stats = SERIES_LIST.map(sn => {
+        const rows = DATA.metrics.filter(m => m.s === sn);
+        const obj = { sn }; cols.forEach(c => { obj[c] = meanStd(rows.map(r => r[c])); }); return obj;
+      });
+      const best = {}; cols.forEach(c => { best[c] = Math.max(...stats.map(s => s[c][0])); });
+      const theme = getTheme();
+      tbody.innerHTML = stats.map((st, idx) => {
+        const fmt = (c, dec) => {
+          const [mu, sd] = st[c];
+          const isBest = c !== "dpk1" && Math.abs(mu - best[c]) < 1e-6;
+          return `<td class="py-2.5 px-3 text-right ${isBest ? "font-bold text-[var(--foreground)]" : "text-[var(--muted-foreground)]"}">${mu.toFixed(dec)} ± ${sd.toFixed(dec)}</td>`;
+        };
+        return `
+          <tr class="hover:bg-[var(--background)]">
+            <td class="py-2.5 px-3 font-sans font-semibold text-[var(--foreground)]">
+              <span class="inline-flex items-center gap-2"><span class="w-2.5 h-2.5 rounded-full" style="background:${theme.palette[idx]}"></span>${st.sn.replace("_", " ")}</span>
+            </td>
+            ${fmt("k", 1)}${fmt("pk1", 1)}${fmt("dpk1", 2)}${fmt("pl", 1)}${fmt("cfe", 2)}${fmt("e30", 2)}${fmt("e39", 2)}${fmt("fmax", 1)}
+          </tr>
+        `;
+      }).join("");
+    }
+
+    function renderAnalytics() {
+      renderSeriesSummaryTable();
+      requestAnimationFrame(() => { drawTrendChart(); drawScatterChart(); });
+    }
+
+    document.getElementById("selTrendMetric").onchange = e => { state.trendMetric = e.target.value; drawTrendChart(); };
+    document.getElementById("selScatterPreset").onchange = e => { state.scatterPreset = e.target.value; state.scatterHoverId = null; drawScatterChart(); };
+    document.getElementById("selScatterColor").onchange = e => { state.scatterColorBy = e.target.value; drawScatterChart(); };
+
+    const scCanvas = document.getElementById("scatterCanvas");
+    scCanvas.addEventListener("mousemove", e => {
+      const rect = scCanvas.getBoundingClientRect();
+      const mx = e.clientX - rect.left, my = e.clientY - rect.top;
+      let best = null, bestD = 22;
+      scatterPointsPx.forEach(p => { const dist = Math.hypot(p.px - mx, p.py - my); if (dist < bestD) { bestD = dist; best = p; } });
+      state.scatterHoverId = best ? best.m.id : null;
+      const out = document.getElementById("scatterReadout");
+      if (best) {
+        const m = best.m;
+        out.innerHTML = `<strong class="text-[var(--foreground)]">${m.id} (${m.s.replace("_", " ")} · Stage ${m.stage})</strong> · k: ${m.k.toFixed(1)} N/mm (${m.rk >= 0 ? "+" : ""}${m.rk}%) · Pk1: ${m.pk1.toFixed(1)} N · Pl: ${m.pl.toFixed(1)} N · CFE: ${m.cfe.toFixed(3)} · E 0–39: ${m.e39.toFixed(2)} J`;
+      } else out.textContent = "Hover over a specimen point to inspect its exact performance profile.";
+      drawScatterChart();
+    });
+    scCanvas.addEventListener("mouseleave", () => {
+      state.scatterHoverId = null;
+      document.getElementById("scatterReadout").textContent = "Hover over a specimen point to inspect its exact performance profile.";
+      drawScatterChart();
+    });
+
+    // ==================== VIEW 5: FULL DATA TABLE ====================
+    function renderFullTable() {
+      let rows = [...DATA.metrics];
+      if (state.tblSeries !== "ALL") rows = rows.filter(m => m.s === state.tblSeries);
+      if (state.tblStage !== "ALL") rows = rows.filter(m => String(m.stage) === state.tblStage);
+      if (state.tblSearch.trim()) {
+        const q = state.tblSearch.trim().toLowerCase();
+        rows = rows.filter(m => m.id.toLowerCase().includes(q) || m.s.toLowerCase().includes(q) || `stage ${m.stage}`.includes(q));
+      }
+      rows.sort((a, b) => {
+        const av = a[state.tblSortKey], bv = b[state.tblSortKey];
+        if (typeof av === "string") return state.tblSortAsc ? av.localeCompare(bv) : bv.localeCompare(av);
+        return state.tblSortAsc ? av - bv : bv - av;
+      });
+      document.getElementById("tblCount").textContent = `${rows.length} of ${DATA.metrics.length} specimens`;
+
+      const maxE = Math.max(...DATA.metrics.map(m => m.e39));
+      const theme = getTheme();
+      const tbody = document.getElementById("fullTableBody");
+      tbody.innerHTML = rows.map(r => {
+        const pct = Math.round((r.e39 / maxE) * 100);
+        const col = stageColor(r.stage, theme);
+        return `
+          <tr class="hover:bg-[var(--background)] transition-colors">
+            <td class="py-2 px-3 font-sans font-medium text-[var(--foreground)]">${r.s.replace("_", " ")}</td>
+            <td class="py-2 px-3 text-center"><span class="inline-flex items-center gap-1.5"><span class="w-2 h-2 rounded-full" style="background:${col}"></span>${r.stage}</span></td>
+            <td class="py-2 px-3 font-semibold text-[var(--foreground)]">${r.id}</td>
+            <td class="py-2 px-3 text-right text-[var(--muted-foreground)]">${r.d0.toFixed(3)}</td>
+            <td class="py-2 px-3 text-right">${r.k.toFixed(1)}</td>
+            <td class="py-2 px-3 text-right ${r.rk > 0 ? "text-[var(--success)]" : "text-[var(--muted-foreground)]"}">${r.rk > 0 ? "+" : ""}${r.rk.toFixed(1)}%</td>
+            <td class="py-2 px-3 text-right">${r.pk1.toFixed(1)}</td>
+            <td class="py-2 px-3 text-right">${r.pl.toFixed(1)}</td>
+            <td class="py-2 px-3 text-right">${r.cfe.toFixed(3)}</td>
+            <td class="py-2 px-3 text-right">${r.e30.toFixed(2)}</td>
+            <td class="py-2 px-3 text-right">
+              <div class="inline-flex items-center gap-2 justify-end">
+                <div class="w-12 h-1.5 rounded-full bg-[var(--border)] overflow-hidden hidden sm:block">
+                  <div class="h-full bg-[var(--primary)]" style="width:${pct}%"></div>
+                </div>
+                <span class="font-semibold text-[var(--foreground)]">${r.e39.toFixed(2)}</span>
+              </div>
+            </td>
+            <td class="py-2 px-3 text-right">${r.fmax.toFixed(1)}</td>
+            <td class="py-2 px-3 text-right ${r.drop > 100 ? "text-[var(--warning)] font-semibold" : "text-[var(--muted-foreground)]"}">${r.drop.toFixed(1)}</td>
+            <td class="py-2 px-3 text-center">
+              <button data-plot="${r.id}" class="plot-row-btn font-sans text-xs text-[var(--link)] hover:underline cursor-pointer">Plot</button>
+            </td>
+          </tr>
+        `;
+      }).join("");
+
+      tbody.querySelectorAll(".plot-row-btn").forEach(btn => {
+        btn.onclick = () => {
+          const m = METRIC_MAP[btn.dataset.plot];
+          state.studioMode = "stage"; state.studioStage = String(m.stage);
+          state.studioHidden.clear(); state.xMin = 0; state.xMax = MAX_DISP;
+          switchView("studio");
+        };
+      });
+    }
+
+    document.getElementById("tblSearch").oninput = e => { state.tblSearch = e.target.value; renderFullTable(); };
+    document.getElementById("tblSeriesFilter").onchange = e => { state.tblSeries = e.target.value; renderFullTable(); };
+    document.getElementById("tblStageFilter").onchange = e => { state.tblStage = e.target.value; renderFullTable(); };
+    document.querySelectorAll("th[data-tsort]").forEach(th => {
+      th.onclick = () => {
+        const k = th.dataset.tsort;
+        if (state.tblSortKey === k) state.tblSortAsc = !state.tblSortAsc;
+        else { state.tblSortKey = k; state.tblSortAsc = k === "s" || k === "id" || k === "stage"; }
+        renderFullTable();
+      };
+    });
+
+    function downloadCsv() {
+      const headers = ["Dataset", "RelaxationStage", "Specimen", "TrimDisp_d0_mm", "TareForce_fbase_N", "Stiffness_N_mm", "DeltaK_pct_vs_S1", "FirstPeak_N", "DeltaPk1_pct_vs_S1", "FirstPeakDisp_mm", "PlateauMean_5_25_N", "PlateauCV_pct", "CFE", "Energy_0_30_J", "Energy_0_39_J", "MaxForce_N", "LateDrop_N"];
+      const lines = [headers.join(",")];
+      DATA.metrics.forEach(m => {
+        lines.push([m.s, m.stage, m.id, m.d0, m.fb, m.k, m.rk, m.pk1, m.rpk1, m.dpk1, m.pl, m.cv, m.cfe, m.e30, m.e39, m.fmax, m.drop].join(","));
+      });
+      const blob = new Blob([lines.join("\n")], { type: "text/csv;charset=utf-8;" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a"); a.href = url; a.download = "relaksirani_voronoi_zeroed_metrics.csv"; a.click();
+      URL.revokeObjectURL(url);
+    }
+    document.getElementById("btnExportCsvTop").onclick = downloadCsv;
+    document.getElementById("btnExportCsvTbl").onclick = downloadCsv;
+
+    function redrawActive() {
+      if (state.view === "relaxation") { drawRelaxCurves(); drawRelaxDeltaChart(); }
+      if (state.view === "overview") drawAllOverviewCanvases();
+      if (state.view === "studio") drawStudioChart();
+      if (state.view === "analytics") { drawTrendChart(); drawScatterChart(); renderSeriesSummaryTable(); }
+    }
+    window.addEventListener("resize", redrawActive);
+    window.addEventListener("themechange", () => {
+      if (state.view === "relaxation") renderRelaxationView();
+      if (state.view === "studio") renderStudioControls();
+      if (state.view === "table") renderFullTable();
+      redrawActive();
+    });
+
+    
+    // Standalone public Light/Dark theme toggle
+    (function initPublicTheme() {
+      const slot = document.getElementById("publicThemeSlot");
+      if (!slot) return;
+      const root = document.documentElement;
+      const prefDark = window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches;
+      let mode = localStorage.getItem("voronoi_theme") || (prefDark ? "dark" : "light");
+      function apply(m) {
+        mode = m;
+        root.dataset.theme = m;
+        root.classList.toggle("light", m === "light");
+        localStorage.setItem("voronoi_theme", m);
+        btn.textContent = m === "dark" ? "Light Theme" : "Dark Theme";
+        window.dispatchEvent(new Event("themechange"));
+      }
+      const btn = document.createElement("button");
+      btn.className = "px-2.5 py-1 rounded-md bg-[var(--card)] border border-[var(--border)] hover:border-[var(--primary)] text-[var(--foreground)] font-medium transition-colors cursor-pointer";
+      btn.onclick = () => apply(mode === "dark" ? "light" : "dark");
+      slot.appendChild(btn);
+      apply(mode);
+    })();
+
+    switchView("relaxation");
+  </script>
+</body>
+</html>
